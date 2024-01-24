@@ -67,6 +67,30 @@ under the License.
 			<scope>provided</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-streaming-java</artifactId>
+			<version>${flink.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-connector-kafka</artifactId>
+			<version>${flink.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-table-api-java</artifactId>
+			<version>${flink.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-table-api-java-bridge</artifactId>
+			<version>${flink.version}</version>
+		</dependency>
+
 		<!-- Add connector dependencies here. They must be in the default scope (compile). -->
 
 		<!-- Example:
@@ -119,7 +143,7 @@ under the License.
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
-				<version>3.1.1</version>
+				<version>3.5.0</version>
 				<executions>
 					<!-- Run shade goal on package phase -->
 					<execution>
@@ -152,9 +176,10 @@ under the License.
 							<transformers>
 								<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
 								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-									<mainClass>org.example.DataStreamJob</mainClass>
+									<mainClass>org.example.KafkaConsoleReader</mainClass>
 								</transformer>
 							</transformers>
+
 						</configuration>
 					</execution>
 				</executions>
