@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="+ jdbc">
+    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="joined both ways; not filtered by _start_time">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" afterDir="false" />
     </list>
@@ -66,7 +66,7 @@
       <workItem from="1705312360723" duration="4217000" />
       <workItem from="1705817386182" duration="3913000" />
       <workItem from="1706071802570" duration="9963000" />
-      <workItem from="1710402419974" duration="21387000" />
+      <workItem from="1710402419974" duration="27288000" />
     </task>
     <task id="LOCAL-00001" summary="initial">
       <created>1705312528155</created>
@@ -103,7 +103,14 @@
       <option name="project" value="LOCAL" />
       <updated>1710497385370</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="joined both ways; not filtered by _start_time">
+      <created>1710498810354</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1710498810354</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -127,6 +134,7 @@
     <MESSAGE value="restart from the beginning: with right data. now works kafka source + 2 columns" />
     <MESSAGE value="src_exploded" />
     <MESSAGE value="+ jdbc" />
-    <option name="LAST_COMMIT_MESSAGE" value="+ jdbc" />
+    <MESSAGE value="joined both ways; not filtered by _start_time" />
+    <option name="LAST_COMMIT_MESSAGE" value="joined both ways; not filtered by _start_time" />
   </component>
 </project>

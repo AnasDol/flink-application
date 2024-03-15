@@ -34,11 +34,12 @@ public class KafkaConsoleReader {
         tableEnv.executeSql(
                 "CREATE TABLE src " +
                 "(" +
-                    "`start_time` TIMESTAMP," +
-                    "`measuring_probe_name` STRING," +
-                    "`imsi` BIGINT," +
-                    "`msisdn` BIGINT," +
-                    "`ms_ip_address` STRING" +
+                    "start_time TIMESTAMP," +
+                    "measuring_probe_name STRING," +
+                    "imsi BIGINT," +
+                    "msisdn BIGINT," +
+                    "ms_ip_address STRING," +
+                    "unique_cdr_id BIGINT" +
                 ") WITH (" +
                     "'connector' = 'kafka'," +
                     "'topic' = 'test3'," +
@@ -144,14 +145,32 @@ public class KafkaConsoleReader {
         );
 
 
-        Table resultTable = tableEnv.from("joined_msip");
-        DataStreamSink<Row> dataStreamSink = tableEnv
-                .toAppendStream(resultTable, Row.class)
-                .print();
+        tableEnv.executeSql(
+                "CREATE TEMPORARY VIEW max_start_time_row AS " +
+                        "SELECT * " +
+                        "FROM (" +
+                        "SELECT *, " +
+                        "ROW_NUMBER() OVER (PARTITION BY unique_cdr_id ORDER BY _start_time DESC) AS row_num " +
+                        "FROM joined_msip) " +
+                        "WHERE row_num = 1"
+        );
 
-        Table resultTable2 = tableEnv.from("joined_imsi_msisdn");
-        DataStreamSink<Row> dataStreamSink2 = tableEnv
-                .toAppendStream(resultTable2, Row.class)
+
+
+//        Table resultTable = tableEnv.from("joined_msip");
+//        DataStreamSink<Row> dataStreamSink = tableEnv
+//                .toAppendStream(resultTable, Row.class)
+//                .print();
+//
+//        Table resultTable2 = tableEnv.from("joined_imsi_msisdn");
+//        DataStreamSink<Row> dataStreamSink2 = tableEnv
+//                .toAppendStream(resultTable2, Row.class)
+//                .print();
+
+        Table resultTable = tableEnv.from("max_start_time_row");
+        DataStreamSink<Tuple2<Boolean, Row>> dataStreamSink = tableEnv
+                .toRetractStream(resultTable, Row.class)
+//                .toAppendStream(resultTable, Row.class)
                 .print();
 
         // Запуск приложения
