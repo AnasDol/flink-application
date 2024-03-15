@@ -71,7 +71,7 @@ public class KafkaConsoleReader {
 //        ResolvedSchema schema2 = tableEnv.from("src_exploded").getResolvedSchema();
 //        System.out.println(schema2.toString());
 
-        tableEnv.executeSql("CREATE TABLE db_imsi_msisdn (" +
+        tableEnv.executeSql("CREATE TABLE imsi_msisdn (" +
                 "imsi BIGINT," +
                 "msisdn BIGINT" +
                 ") WITH (" +
@@ -109,6 +109,24 @@ public class KafkaConsoleReader {
         );
 
         tableEnv.executeSql(
+                "CREATE TEMPORARY VIEW joined_imsi_msisdn AS " +
+                        "SELECT * " +
+                        "FROM src_extended " +
+                        "JOIN (" +
+                        "   SELECT " +
+                        "   imsi AS _imsi, " +
+                        "   msisdn AS _msisdn" +
+                        "   FROM imsi_msisdn" +
+                        ") AS imsi_msisdn_renamed " +
+                        "ON (" +
+                        "imsi = _imsi" +
+                        ") " +
+                        "WHERE imsi IS NOT NULL "
+//                        + "AND IMSI NOT LIKE '999%"
+
+        );
+
+        tableEnv.executeSql(
                 "CREATE TEMPORARY VIEW joined_msip AS " +
                         "SELECT * " +
                         "FROM src_exploded " +
@@ -129,6 +147,11 @@ public class KafkaConsoleReader {
         Table resultTable = tableEnv.from("joined_msip");
         DataStreamSink<Row> dataStreamSink = tableEnv
                 .toAppendStream(resultTable, Row.class)
+                .print();
+
+        Table resultTable2 = tableEnv.from("joined_imsi_msisdn");
+        DataStreamSink<Row> dataStreamSink2 = tableEnv
+                .toAppendStream(resultTable2, Row.class)
                 .print();
 
         // Запуск приложения
