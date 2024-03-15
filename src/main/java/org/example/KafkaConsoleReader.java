@@ -27,6 +27,10 @@ public class KafkaConsoleReader {
         StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env);
         tableEnv.registerFunction("split", new Split(";"));
 
+        String jdbc_url = "jdbc:postgresql://host.docker.internal:5432/diploma";
+        String jdbc_user = "postgres";
+        String jdbc_password = "7844";
+
         tableEnv.executeSql(
                 "CREATE TABLE src " +
                 "(" +
@@ -67,7 +71,62 @@ public class KafkaConsoleReader {
 //        ResolvedSchema schema2 = tableEnv.from("src_exploded").getResolvedSchema();
 //        System.out.println(schema2.toString());
 
-        Table resultTable = tableEnv.from("src_exploded");
+        tableEnv.executeSql("CREATE TABLE db_imsi_msisdn (" +
+                "imsi BIGINT," +
+                "msisdn BIGINT" +
+                ") WITH (" +
+                "'connector' = 'jdbc'," +
+                "'url' = '" + jdbc_url + "'," +
+                "'table-name' = '" + "public.imsi_msisdn" + "'," +
+                "'username' = '" + jdbc_user + "'," +
+                "'password' = '" + jdbc_password + "'" +
+                ")");
+
+        tableEnv.executeSql("CREATE TABLE ms_ip (" +
+                "start_time TIMESTAMP," +
+                "imsi BIGINT," +
+                "msisdn BIGINT," +
+                "ms_ip_address STRING " +
+//                "probe AS _probe,"
+                ") WITH (" +
+                "'connector' = 'jdbc'," +
+                "'url' = '" + jdbc_url + "'," +
+                "'table-name' = '" + "public.ms_ip" + "'," +
+                "'username' = '" + jdbc_user + "'," +
+                "'password' = '" + jdbc_password + "'" +
+                ")");
+
+        tableEnv.executeSql(
+                "CREATE TEMPORARY VIEW ms_ip_exploded AS " +
+                        "SELECT " +
+                        "ms_ip.imsi AS _imsi," +
+                        "ms_ip.msisdn AS _msisdn," +
+                        "ms_ip.start_time AS _start_time," +
+//                        "ms_ip.probe AS _probe," +
+                        "TRIM(_ip) AS _ip " +
+                        "FROM ms_ip, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(_ip) " +
+                        "WHERE TRIM(_ip) <> ''"
+        );
+
+        tableEnv.executeSql(
+                "CREATE TEMPORARY VIEW joined_msip AS " +
+                        "SELECT * " +
+                        "FROM src_exploded " +
+                        "JOIN ms_ip_exploded " +
+                        "ON (" +
+//                        "probe = _probe " +
+//                        "AND " +
+                        "ip = _ip " +
+                        "AND " +
+                        "start_time >= _start_time" +
+                        ") " +
+                        "WHERE imsi IS NULL "
+//                        + "OR IMSI LIKE '999%"
+
+        );
+
+
+        Table resultTable = tableEnv.from("joined_msip");
         DataStreamSink<Row> dataStreamSink = tableEnv
                 .toAppendStream(resultTable, Row.class)
                 .print();
