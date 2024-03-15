@@ -1,12 +1,16 @@
 package org.example;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.EnvironmentSettings;
-import org.apache.flink.table.api.Expressions;
-import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.*;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.functions.TableFunction;
 import org.apache.flink.types.Row;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.apache.flink.table.api.Expressions.*;
 
@@ -21,6 +25,7 @@ public class KafkaConsoleReader {
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env);
+        tableEnv.registerFunction("split", new Split(";"));
 
         tableEnv.executeSql(
                 "CREATE TABLE src " +
@@ -41,15 +46,6 @@ public class KafkaConsoleReader {
                     "'scan.startup.mode' = 'latest-offset'" +
                 ")");
 
-//        Table src = tableEnv.from("src");
-//
-//        Table src_extended = src
-//                .select($("*"))
-//                .addColumns(
-//                        $("start_time").toDate().as("event_date"),
-//                        $("measuring_probe_name").substring(1,2).as("probe")
-//                );
-
         tableEnv.executeSql(
                 "CREATE TEMPORARY VIEW src_extended AS " +
                         "SELECT *, " +
@@ -58,7 +54,20 @@ public class KafkaConsoleReader {
                         "FROM src"
         );
 
-        Table resultTable = tableEnv.from("src_extended");
+        ResolvedSchema schema = tableEnv.from("src_extended").getResolvedSchema();
+
+        tableEnv.executeSql(
+                "CREATE TEMPORARY VIEW src_exploded AS " +
+                        "SELECT src_extended.*, " +
+                        "TRIM(ip) AS ip " +
+                        "FROM src_extended, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(ip) " +
+                        "WHERE TRIM(ip) <> ''"
+        );
+
+//        ResolvedSchema schema2 = tableEnv.from("src_exploded").getResolvedSchema();
+//        System.out.println(schema2.toString());
+
+        Table resultTable = tableEnv.from("src_exploded");
         DataStreamSink<Row> dataStreamSink = tableEnv
                 .toAppendStream(resultTable, Row.class)
                 .print();
@@ -66,38 +75,19 @@ public class KafkaConsoleReader {
         // Запуск приложения
         env.execute("Kafka Console Reader");
 
+    }
 
+    public static class Split extends TableFunction<String> {
+        private String separator = ",";
 
+        public Split(String separator){
+            this.separator = separator;
+        }
 
-//        tableEnv.executeSql("CREATE TABLE example_table_kafka (" +
-//                "`id` DECIMAL," +
-//                "`number` BIGINT," +
-//                "`ip` STRING" +
-//                ") WITH (" +
-//                "'connector' = 'kafka'," +
-//                "'topic' = 'test2'," +
-//                "'value.format' = 'csv'," +
-//                "'value.csv.null-literal' = ''," +
-//                "'value.csv.ignore-parse-errors' = 'true'," +
-//                "'properties.bootstrap.servers' = 'kafka:9092'," +
-//                "'properties.group.id' = 'flink-table-group'," +
-//                "'scan.startup.mode' = 'latest-offset')");
-//
-//        tableEnv.executeSql("CREATE TABLE example_print_table (" +
-//                "id DECIMAL(10,2)," +
-//                "number BIGINT," +
-//                "ip STRING" +
-//                ") WITH (" +
-//                "'connector' = 'filesystem'," +
-//                "'path' = 'hdfs://namenode:9000/'," +
-//                "'format' = 'csv'," +
-//                "'partition.default-name' = 'my-file_')");
-//
-//        Table tableExample = tableEnv.from("example_table_kafka");
-//        tableExample
-//                .addOrReplaceColumns($("ip").replace(lit(" "), lit("")).as("ip"))
-//                .executeInsert("example_print_table");
-
-
+        public void eval(String str){
+            for (String s: str.split(separator)){
+                    collect(s);
+            }
+        }
     }
 }
