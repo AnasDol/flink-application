@@ -1,14 +1,21 @@
 package org.example;
 
+import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.windowing.assigners.EventTimeSessionWindows;
+import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows;
+import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.table.api.*;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.functions.TableFunction;
 import org.apache.flink.types.Row;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -145,15 +152,35 @@ public class KafkaConsoleReader {
         );
 
 
-        tableEnv.executeSql(
-                "CREATE TEMPORARY VIEW max_start_time_row AS " +
-                        "SELECT * " +
-                        "FROM (" +
-                        "SELECT *, " +
-                        "ROW_NUMBER() OVER (PARTITION BY unique_cdr_id ORDER BY _start_time DESC) AS row_num " +
-                        "FROM joined_msip) " +
-                        "WHERE row_num = 1"
-        );
+//        // option 1 - use TopN statement. Problem - not append-only mode
+//        tableEnv.executeSql(
+//                "CREATE TEMPORARY VIEW max_start_time_row AS " +
+//                        "SELECT * " +
+//                        "FROM (" +
+//                        "SELECT *, " +
+//                        "ROW_NUMBER() OVER (PARTITION BY unique_cdr_id ORDER BY _start_time DESC) AS row_num " +
+//                        "FROM joined_msip) " +
+//                        "WHERE row_num = 1"
+//        );
+
+
+        // option 2 - use keyed session window
+
+        DataStream<Row> joined_msip_DS = tableEnv.toDataStream(tableEnv.from("joined_msip"));
+
+        // Применяем ключевое поле для группировки
+        DataStream<Row> keyedStream = joined_msip_DS
+                .keyBy((KeySelector<Row, Object>) value -> value.getField("unique_cdr_id"))
+                .window(ProcessingTimeSessionWindows.withGap(Time.milliseconds(1000)))
+                .aggregate(new MaxStartTimeAggregate());
+
+
+        DataStreamSink<Row> dataStreamSink = keyedStream.print();
+
+        Table resultTable = tableEnv.from("joined_imsi_msisdn");
+        DataStreamSink<Row> dataStreamSink2 = tableEnv
+                .toAppendStream(resultTable, Row.class)
+                .print();
 
 
 
@@ -162,16 +189,12 @@ public class KafkaConsoleReader {
 //                .toAppendStream(resultTable, Row.class)
 //                .print();
 //
-//        Table resultTable2 = tableEnv.from("joined_imsi_msisdn");
-//        DataStreamSink<Row> dataStreamSink2 = tableEnv
-//                .toAppendStream(resultTable2, Row.class)
-//                .print();
 
-        Table resultTable = tableEnv.from("max_start_time_row");
-        DataStreamSink<Tuple2<Boolean, Row>> dataStreamSink = tableEnv
-                .toRetractStream(resultTable, Row.class)
-//                .toAppendStream(resultTable, Row.class)
-                .print();
+
+//        Table resultTable = tableEnv.from("max_start_time_row");
+//        DataStreamSink<Tuple2<Boolean, Row>> dataStreamSink = tableEnv
+//                .toRetractStream(resultTable, Row.class)
+//                .print();
 
         // Запуск приложения
         env.execute("Kafka Console Reader");
@@ -189,6 +212,35 @@ public class KafkaConsoleReader {
             for (String s: str.split(separator)){
                     collect(s);
             }
+        }
+    }
+
+    public static class MaxStartTimeAggregate implements AggregateFunction<Row, Row, Row> {
+
+        @Override
+        public Row createAccumulator() {
+            return null;
+        }
+
+        @Override
+        public Row add(Row value, Row accumulator) {
+            if (accumulator == null || ((LocalDateTime) value.getField("_start_time")).isAfter((LocalDateTime) accumulator.getField("_start_time"))) {
+                return value;
+            }
+            return accumulator;
+        }
+
+        @Override
+        public Row getResult(Row accumulator) {
+            return accumulator;
+        }
+
+        @Override
+        public Row merge(Row a, Row b) {
+            if (a == null || ((LocalDateTime) b.getField("_start_time")).isAfter((LocalDateTime) a.getField("_start_time"))) {
+                return b; // Merge two accumulators by keeping the one with larger _start_time
+            }
+            return a;
         }
     }
 }
