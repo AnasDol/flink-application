@@ -2,24 +2,22 @@ package org.example;
 
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.windowing.assigners.EventTimeSessionWindows;
 import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
-import org.apache.flink.table.api.*;
+import org.apache.flink.table.api.EnvironmentSettings;
+import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.functions.TableFunction;
 import org.apache.flink.types.Row;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
-import static org.apache.flink.table.api.Expressions.*;
+import static org.apache.flink.table.api.Expressions.$;
+import static org.apache.flink.table.api.Expressions.coalesce;
 
 public class KafkaConsoleReader {
 
@@ -66,7 +64,9 @@ public class KafkaConsoleReader {
                         "FROM src"
         );
 
-        ResolvedSchema schema = tableEnv.from("src_extended").getResolvedSchema();
+//        ResolvedSchema resolvedSchema = tableEnv.from("src_extended").getResolvedSchema();
+//
+//        Schema schema = tableEnv.from("src_extended").getSchema().toSchema();
 
         tableEnv.executeSql(
                 "CREATE TEMPORARY VIEW src_exploded AS " +
@@ -75,9 +75,6 @@ public class KafkaConsoleReader {
                         "FROM src_extended, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(ip) " +
                         "WHERE TRIM(ip) <> ''"
         );
-
-//        ResolvedSchema schema2 = tableEnv.from("src_exploded").getResolvedSchema();
-//        System.out.println(schema2.toString());
 
         tableEnv.executeSql("CREATE TABLE imsi_msisdn (" +
                 "imsi BIGINT," +
@@ -134,6 +131,23 @@ public class KafkaConsoleReader {
 
         );
 
+        Table joinedImsiMsisdnTable = tableEnv.from("joined_imsi_msisdn")
+                .addOrReplaceColumns(coalesce($("_imsi"), $("imsi")).as("imsi"))
+                .addOrReplaceColumns(coalesce($("_msisdn"), $("msisdn")).as("msisdn"))
+                .select(
+                        $("start_time"), // херня, лучше было бы найти способ через схему. либо переделать на SQL
+                        $("measuring_probe_name"),
+                        $("imsi"),
+                        $("msisdn"),
+                        $("ms_ip_address"),
+                        $("unique_cdr_id"),
+                        $("event_date"),
+                        $("probe")
+                );
+
+        System.out.println("joinedImsiMsisdnTable schema:");
+        joinedImsiMsisdnTable.printSchema();
+
         tableEnv.executeSql(
                 "CREATE TEMPORARY VIEW joined_msip AS " +
                         "SELECT * " +
@@ -152,51 +166,78 @@ public class KafkaConsoleReader {
         );
 
 
-//        // option 1 - use TopN statement. Problem - not append-only mode
-//        tableEnv.executeSql(
-//                "CREATE TEMPORARY VIEW max_start_time_row AS " +
-//                        "SELECT * " +
-//                        "FROM (" +
-//                        "SELECT *, " +
-//                        "ROW_NUMBER() OVER (PARTITION BY unique_cdr_id ORDER BY _start_time DESC) AS row_num " +
-//                        "FROM joined_msip) " +
-//                        "WHERE row_num = 1"
-//        );
 
+        Table joinedMsipTable = tableEnv.from("joined_msip")
+                .addOrReplaceColumns(coalesce($("_imsi"), $("imsi")).as("imsi"))
+                .addOrReplaceColumns(coalesce($("_msisdn"), $("msisdn")).as("msisdn"));
 
-        // option 2 - use keyed session window
+        Schema joinedMsipSchema = joinedMsipTable.getSchema().toSchema();
 
-        DataStream<Row> joined_msip_DS = tableEnv.toDataStream(tableEnv.from("joined_msip"));
-
-        // Применяем ключевое поле для группировки
-        DataStream<Row> keyedStream = joined_msip_DS
+        // keyed session windows
+        DataStream<Row> joined_msip_DS = tableEnv.toDataStream(joinedMsipTable);
+        DataStream<Row> filtered = joined_msip_DS
                 .keyBy((KeySelector<Row, Object>) value -> value.getField("unique_cdr_id"))
-                .window(ProcessingTimeSessionWindows.withGap(Time.milliseconds(1000)))
+                .window(ProcessingTimeSessionWindows.withGap(Time.milliseconds(3000)))
                 .aggregate(new MaxStartTimeAggregate());
 
+        Table filteredTable = tableEnv.fromDataStream(filtered, joinedMsipSchema) // беда
+//                .select(
+//                        $("start_time"), // херня, лучше было бы найти способ через схему. либо переделать на SQL
+//                        $("measuring_probe_name"),
+//                        $("imsi"),
+//                        $("msisdn"),
+//                        $("ms_ip_address"),
+//                        $("unique_cdr_id"),
+//                        $("event_date"),
+//                        $("probe")
+//                )
+                ;
 
-        DataStreamSink<Row> dataStreamSink = keyedStream.print();
-
-        Table resultTable = tableEnv.from("joined_imsi_msisdn");
-        DataStreamSink<Row> dataStreamSink2 = tableEnv
-                .toAppendStream(resultTable, Row.class)
-                .print();
+        System.out.println("filteredTable schema:");
+        filteredTable.printSchema();
 
 
 
-//        Table resultTable = tableEnv.from("joined_msip");
-//        DataStreamSink<Row> dataStreamSink = tableEnv
-//                .toAppendStream(resultTable, Row.class)
-//                .print();
-//
+        tableEnv.executeSql(
+                "CREATE TABLE sinkTable " +
+                        "(" +
+                        "start_time TIMESTAMP," +
+                        "measuring_probe_name STRING," +
+                        "imsi BIGINT," +
+                        "msisdn BIGINT," +
+                        "ms_ip_address STRING," +
+                        "unique_cdr_id BIGINT," +
+                        "event_date DATE," +
+                        "probe STRING," +
+                        "_imsi BIGINT," +
+                        "_msisdn BIGINT" +
+                        ") PARTITIONED BY (event_date, probe) WITH (" +
+                        "'connector' = 'filesystem'," +
+                        "'path' = './flink_parquet_results'," +
+                        "'format' = 'parquet'," +
+                        "'sink.rolling-policy.file-size' = '110MB'," +
+                        "'sink.rolling-policy.check-interval' = '5 s'," +
+                        "'sink.rolling-policy.rollover-interval' = '20 s'" +
+                        ")");
 
 
-//        Table resultTable = tableEnv.from("max_start_time_row");
-//        DataStreamSink<Tuple2<Boolean, Row>> dataStreamSink = tableEnv
-//                .toRetractStream(resultTable, Row.class)
-//                .print();
 
-        // Запуск приложения
+        // sink в консоль
+
+        DataStreamSink<Row> printSink1 = tableEnv
+                .toAppendStream(filteredTable, Row.class)
+                .print("filteredSink (filteredTable)");
+
+        DataStreamSink<Row> printSink2 = tableEnv
+                .toAppendStream(joinedImsiMsisdnTable, Row.class)
+                .print("printSink2 (joinedImsiMsisdnTable)");
+
+        // sink в фс
+
+        filteredTable.insertInto("sinkTable");
+        joinedImsiMsisdnTable.insertInto("sinkTable");
+
+
         env.execute("Kafka Console Reader");
 
     }
