@@ -29,6 +29,7 @@ public class KafkaConsoleReader {
                 .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
         StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env);
         tableEnv.registerFunction("split", new Split(";"));
 
@@ -64,9 +65,7 @@ public class KafkaConsoleReader {
                         "FROM src"
         );
 
-//        ResolvedSchema resolvedSchema = tableEnv.from("src_extended").getResolvedSchema();
-//
-//        Schema schema = tableEnv.from("src_extended").getSchema().toSchema();
+
 
         tableEnv.executeSql(
                 "CREATE TEMPORARY VIEW src_exploded AS " +
@@ -173,6 +172,8 @@ public class KafkaConsoleReader {
 
         Schema joinedMsipSchema = joinedMsipTable.getSchema().toSchema();
 
+
+
         // keyed session windows
         DataStream<Row> joined_msip_DS = tableEnv.toDataStream(joinedMsipTable);
         DataStream<Row> filtered = joined_msip_DS
@@ -182,11 +183,10 @@ public class KafkaConsoleReader {
 
 
 
-        tableEnv.registerDataStream(
-                "filtered",
-                filtered
-//                "start_time, measuring_probe_name, imsi, msisdn, ms_ip_address, unique_cdr_id, event_date, probe, ip, _imsi, _msisdn, _start_time, _ip"
-        );
+//        tableEnv.registerDataStream(
+//                "filtered",
+//                filtered
+//        );
 
         Table filteredTable = tableEnv
                 .fromDataStream(filtered.map(x -> x).returns(Types.ROW(
@@ -243,9 +243,7 @@ public class KafkaConsoleReader {
                         "ms_ip_address STRING," +
                         "unique_cdr_id BIGINT," +
                         "event_date DATE," +
-                        "probe STRING," +
-                        "_imsi BIGINT," +
-                        "_msisdn BIGINT" +
+                        "probe STRING" +
                         ") PARTITIONED BY (event_date, probe) WITH (" +
                         "'connector' = 'filesystem'," +
                         "'path' = './flink_parquet_results'," +
@@ -269,8 +267,8 @@ public class KafkaConsoleReader {
 
         // sink в фс
 
-        filteredTable.insertInto("sinkTable");
-        joinedImsiMsisdnTable.insertInto("sinkTable");
+        filteredTable.insertInto("sinkTable").execute();
+        joinedImsiMsisdnTable.insertInto("sinkTable").execute();
 
 
         env.execute("Kafka Console Reader");
