@@ -4,9 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="TopN statement replaced with session window aggregation">
+    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="problem with Datastream&lt;Row&gt; -&gt; Table transformation">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -78,7 +77,8 @@
       <workItem from="1710402419974" duration="28298000" />
       <workItem from="1710574746036" duration="9760000" />
       <workItem from="1710825490257" duration="4168000" />
-      <workItem from="1711609603925" duration="45455000" />
+      <workItem from="1711609603925" duration="46284000" />
+      <workItem from="1712210311276" duration="4753000" />
     </task>
     <task id="LOCAL-00001" summary="initial">
       <created>1705312528155</created>
@@ -136,7 +136,14 @@
       <option name="project" value="LOCAL" />
       <updated>1710664116837</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="problem with Datastream&lt;Row&gt; -&gt; Table transformation">
+      <created>1712142209523</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1712142209523</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -163,6 +170,7 @@
     <MESSAGE value="joined both ways; not filtered by _start_time" />
     <MESSAGE value="filtered, but in strange mode (toRetractStream) - may provoke future problems. unique_crd_id in use!" />
     <MESSAGE value="TopN statement replaced with session window aggregation" />
-    <option name="LAST_COMMIT_MESSAGE" value="TopN statement replaced with session window aggregation" />
+    <MESSAGE value="problem with Datastream&lt;Row&gt; -&gt; Table transformation" />
+    <option name="LAST_COMMIT_MESSAGE" value="problem with Datastream&lt;Row&gt; -&gt; Table transformation" />
   </component>
 </project>

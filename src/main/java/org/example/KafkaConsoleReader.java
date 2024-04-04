@@ -1,6 +1,7 @@
 package org.example;
 
 import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
@@ -16,8 +17,7 @@ import org.apache.flink.types.Row;
 
 import java.time.LocalDateTime;
 
-import static org.apache.flink.table.api.Expressions.$;
-import static org.apache.flink.table.api.Expressions.coalesce;
+import static org.apache.flink.table.api.Expressions.*;
 
 public class KafkaConsoleReader {
 
@@ -180,22 +180,57 @@ public class KafkaConsoleReader {
                 .window(ProcessingTimeSessionWindows.withGap(Time.milliseconds(3000)))
                 .aggregate(new MaxStartTimeAggregate());
 
-        Table filteredTable = tableEnv.fromDataStream(filtered, joinedMsipSchema) // беда
-//                .select(
-//                        $("start_time"), // херня, лучше было бы найти способ через схему. либо переделать на SQL
-//                        $("measuring_probe_name"),
-//                        $("imsi"),
-//                        $("msisdn"),
-//                        $("ms_ip_address"),
-//                        $("unique_cdr_id"),
-//                        $("event_date"),
-//                        $("probe")
-//                )
-                ;
+
+
+        tableEnv.registerDataStream(
+                "filtered",
+                filtered
+//                "start_time, measuring_probe_name, imsi, msisdn, ms_ip_address, unique_cdr_id, event_date, probe, ip, _imsi, _msisdn, _start_time, _ip"
+        );
+
+        Table filteredTable = tableEnv
+                .fromDataStream(filtered.map(x -> x).returns(Types.ROW(
+                        Types.LOCAL_DATE_TIME,
+                        Types.STRING,
+                        Types.LONG,
+                        Types.LONG,
+                        Types.STRING,
+                        Types.LONG,
+                        Types.LOCAL_DATE,
+                        Types.STRING,
+                        Types.STRING,
+                        Types.LONG,
+                        Types.LONG,
+                        Types.LOCAL_DATE_TIME,
+                        Types.STRING)))
+                .as(
+                        "start_time",
+                        "measuring_probe_name",
+                        "imsi",
+                        "msisdn",
+                        "ms_ip_address",
+                        "unique_cdr_id",
+                        "event_date",
+                        "probe",
+                        "ip",
+                        "_imsi",
+                        "_msisdn",
+                        "_start_time",
+                        "_ip"
+                )
+                .select(
+                        $("start_time"), // херня, лучше было бы найти способ через схему. либо переделать на SQL
+                        $("measuring_probe_name"),
+                        $("imsi"),
+                        $("msisdn"),
+                        $("ms_ip_address"),
+                        $("unique_cdr_id"),
+                        $("event_date"),
+                        $("probe")
+                );
 
         System.out.println("filteredTable schema:");
         filteredTable.printSchema();
-
 
 
         tableEnv.executeSql(
@@ -226,7 +261,7 @@ public class KafkaConsoleReader {
 
         DataStreamSink<Row> printSink1 = tableEnv
                 .toAppendStream(filteredTable, Row.class)
-                .print("filteredSink (filteredTable)");
+                .print("printSink1 (filteredTable)");
 
         DataStreamSink<Row> printSink2 = tableEnv
                 .toAppendStream(joinedImsiMsisdnTable, Row.class)
