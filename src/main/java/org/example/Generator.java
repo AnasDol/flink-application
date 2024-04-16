@@ -12,7 +12,6 @@ import org.apache.flink.streaming.api.functions.source.datagen.DataGenerator;
 import org.apache.flink.streaming.api.functions.source.datagen.DataGeneratorSource;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.table.functions.TableFunction;
 
 
 import java.io.Serializable;
@@ -59,25 +58,24 @@ class CsvData implements Serializable {
 
 		private static final List<String> probes = Arrays.asList("DE", "cl", "ek", "ir", "kg", "kh", "mn", "nn", "ns", "rd", "sp", "sr", "st", "vr", "yd");
 
+		private String sqlStatement =
+				"SELECT\n" +
+				"    ms_ip.imsi AS imsi,\n" +
+				"    ms_ip.msisdn AS msisdn,\n" +
+				"    TRIM(ip_table) AS ip\n" +
+				"FROM\n" +
+				"    public.ms_ip,\n" +
+				"    unnest(string_to_array(TRIM(ms_ip_address), ';')) AS ip_table\n" +
+				"WHERE\n" +
+				"    TRIM(ip_table) <> ''\n" +
+				"ORDER BY\n" +
+				"    RANDOM();";
+
 		@Override
 		public void open(String s, FunctionInitializationContext functionInitializationContext, RuntimeContext runtimeContext) throws Exception {
 			generator = new RandomDataGenerator();
 			connection = DriverManager.getConnection(url, user, password);
-//			preparedStatement = connection.prepareStatement("SELECT imsi, msisdn, ms_ip_address FROM public.ms_ip ORDER BY RANDOM()",
-//					ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-
-			preparedStatement = connection.prepareStatement(
-					"SELECT\n" +
-							"    ms_ip.imsi AS imsi,\n" +
-							"    ms_ip.msisdn AS msisdn,\n" +
-							"    TRIM(ip_table) AS ip\n" +
-							"FROM\n" +
-							"    public.ms_ip,\n" +
-							"    unnest(string_to_array(TRIM(ms_ip_address), ';')) AS ip_table\n" +
-							"WHERE\n" +
-							"    TRIM(ip_table) <> ''\n" +
-							"ORDER BY\n" +
-							"    RANDOM();",
+			preparedStatement = connection.prepareStatement(sqlStatement,
 					ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
 
 			resultSet = preparedStatement.executeQuery();
@@ -96,12 +94,13 @@ class CsvData implements Serializable {
 				if (!resultSet.next()) {
 					resultSet.close();
 					resultSet = preparedStatement.executeQuery();
+					resultSet.first();
 				}
 
 				return new CsvData(
 						generateStartTime(
-								dateFormatter.parse("2020-02-05").getTime(),
-								dateFormatter.parse("2024-02-05").getTime()
+								1580835600000L,// 2020-02-05
+								1707066000000L // 2024-02-05
 						),
 						generateMeasuringProbeName(probes),
 						getValueWithProbability(resultSet.getLong("imsi"), 0.5),
@@ -110,7 +109,7 @@ class CsvData implements Serializable {
 						index++
 				);
 
-			} catch (SQLException | ParseException e) {
+			} catch (SQLException e) {
 				throw new RuntimeException(e);
 			}
 		}
@@ -139,14 +138,12 @@ class CsvData implements Serializable {
 
 	@Override
 	public String toString() {
-		return "CsvData{" +
-				"start_time=" + start_time +
-				", measuringProbeName='" + measuringProbeName + '\'' +
-				", imsi=" + imsi +
-				", msisdn=" + msisdn +
-				", msIpAddress='" + msIpAddress + '\'' +
-				", uniqueCdrId=" + uniqueCdrId +
-				'}';
+		return start_time +
+				"," + measuringProbeName +
+				"," + imsi +
+				"," + msisdn +
+				"," + msIpAddress +
+				"," + uniqueCdrId;
 	}
 }
 
@@ -162,8 +159,6 @@ public class Generator {
 		config = ConfigFactory.load("flink.conf");
 		settings = EnvironmentSettings.newInstance().inStreamingMode().build();
 		env = StreamExecutionEnvironment.getExecutionEnvironment();
-		tEnv = StreamTableEnvironment.create(env);
-		tEnv.registerFunction("split", new Split(";"));
 
 
 		DataGeneratorSource<CsvData> dataGeneratorSource = new DataGeneratorSource<>(
@@ -181,18 +176,4 @@ public class Generator {
 
 	}
 
-
-	public static class Split extends TableFunction<String> {
-		private String separator = ",";
-
-		public Split(String separator){
-			this.separator = separator;
-		}
-
-		public void eval(String str){
-			for (String s: str.split(separator)){
-				collect(s);
-			}
-		}
-	}
 }

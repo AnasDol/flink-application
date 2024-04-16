@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="Generator added: initial commit">
+    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="Generator: connect with db">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/example/Generator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/Generator.java" afterDir="false" />
     </list>
@@ -89,7 +89,7 @@
       <workItem from="1712210311276" duration="9456000" />
       <workItem from="1712254426037" duration="4609000" />
       <workItem from="1712566862133" duration="2215000" />
-      <workItem from="1713105618841" duration="28399000" />
+      <workItem from="1713105618841" duration="30287000" />
     </task>
     <task id="LOCAL-00001" summary="initial">
       <created>1705312528155</created>
@@ -175,7 +175,14 @@
       <option name="project" value="LOCAL" />
       <updated>1713270987024</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="Generator: connect with db">
+      <created>1713290817386</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1713290817386</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -206,6 +213,7 @@
     <MESSAGE value="problem with Datastream&lt;Row&gt; -&gt; Table transformation - solved" />
     <MESSAGE value="3 jobs starting" />
     <MESSAGE value="Generator added: initial commit" />
-    <option name="LAST_COMMIT_MESSAGE" value="Generator added: initial commit" />
+    <MESSAGE value="Generator: connect with db" />
+    <option name="LAST_COMMIT_MESSAGE" value="Generator: connect with db" />
   </component>
 </project>
