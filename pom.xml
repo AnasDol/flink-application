@@ -98,9 +98,21 @@ under the License.
 		</dependency>
 
 		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-connector-datagen</artifactId>
+			<version>${flink.version}</version>
+		</dependency>
+
+		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
 			<version>42.7.1</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.typesafe</groupId>
+			<artifactId>config</artifactId>
+			<version>1.4.2</version>
 		</dependency>
 
 		<dependency>
@@ -144,24 +156,50 @@ under the License.
 			<artifactId>flink-hadoop-fs</artifactId>
 			<version>${flink.version}</version>
 		</dependency>
-<!--		<dependency>-->
-<!--			<groupId>org.apache.hadoop</groupId>-->
-<!--			<artifactId>hadoop-common</artifactId>-->
-<!--			<version>3.2.1</version>-->
+
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-common</artifactId>
+			<version>3.2.1</version>
 <!--			<scope>provided</scope>-->
-<!--		</dependency>-->
+		</dependency>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-hdfs</artifactId>
 			<version>3.2.1</version>
-			<scope>provided</scope>
+<!--			<scope>provided</scope>-->
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-client</artifactId>
+			<artifactId>hadoop-mapreduce-client-core</artifactId>
 			<version>3.2.1</version>
-			<scope>provided</scope>
+			<!--			<scope>provided</scope>-->
 		</dependency>
+
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-auth</artifactId>
+			<version>3.2.1</version>
+			<!--			<scope>provided</scope>-->
+		</dependency>
+		<dependency>
+			<groupId>org.apache.parquet</groupId>
+			<artifactId>parquet-hadoop</artifactId>
+			<version>1.10.1</version>
+			<!--			<scope>provided</scope>-->
+		</dependency>
+<!--		<dependency>-->
+<!--			<groupId>org.apache.hadoop</groupId>-->
+<!--			<artifactId>hadoop-client</artifactId>-->
+<!--			<version>3.2.1</version>-->
+<!--			<scope>provided</scope>-->
+<!--		</dependency>-->
+
+<!--		<dependency>-->
+<!--			<groupId>org.apache.flink</groupId>-->
+<!--			<artifactId>flink-hadoop-compatibility_2.12</artifactId>-->
+<!--			<version>${flink.version}</version>-->
+<!--		</dependency>-->
 
 		<!-- Add connector dependencies here. They must be in the default scope (compile). -->
 

@@ -1,5 +1,7 @@
 package org.example;
 
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.functions.KeySelector;
@@ -11,6 +13,7 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.functions.TableFunction;
 import org.apache.flink.types.Row;
@@ -21,174 +24,63 @@ import static org.apache.flink.table.api.Expressions.*;
 
 public class KafkaConsoleReader {
 
+    private static Config config;
+    private static EnvironmentSettings settings;
+    private static StreamExecutionEnvironment env;
+    private static StreamTableEnvironment tEnv;
+
     public static void main(String[] args) throws Exception {
 
-        EnvironmentSettings settings = EnvironmentSettings
+//        if (args.length < 1) {
+//            throw new IllegalArgumentException("Path to config should be specified!");
+//        }
+//        config = ConfigFactory.parseFile(new File(args[0]));
+
+        config = ConfigFactory.load("flink.conf");
+
+        settings = EnvironmentSettings
                 .newInstance()
                 .inStreamingMode()
                 .build();
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.enableCheckpointing(config.getLong("checkpointing.interval"));
 
-        StreamTableEnvironment tableEnv = StreamTableEnvironment.create(env);
-        tableEnv.registerFunction("split", new Split(";"));
-
-        String jdbc_url = "jdbc:postgresql://host.docker.internal:5432/diploma";
-        String jdbc_user = "postgres";
-        String jdbc_password = "7844";
-
-        tableEnv.executeSql(
-                "CREATE TABLE src " +
-                "(" +
-                    "start_time TIMESTAMP," +
-                    "measuring_probe_name STRING," +
-                    "imsi BIGINT," +
-                    "msisdn BIGINT," +
-                    "ms_ip_address STRING," +
-                    "unique_cdr_id BIGINT" +
-                ") WITH (" +
-                    "'connector' = 'kafka'," +
-                    "'topic' = 'test3'," +
-                    "'value.format' = 'csv'," +
-                    "'value.csv.null-literal' = ''," +
-                    "'value.csv.ignore-parse-errors' = 'true'," +
-                    "'properties.bootstrap.servers' = 'kafka:9092'," +
-                    "'properties.group.id' = 'flink-table-group'," +
-                    "'scan.startup.mode' = 'latest-offset'" +
-                ")");
-
-        tableEnv.executeSql(
-                "CREATE TEMPORARY VIEW src_extended AS " +
-                        "SELECT *, " +
-                        "  CAST(start_time AS DATE) AS event_date, " +
-                        "  SUBSTRING(measuring_probe_name, 1, 2) AS probe " +
-                        "FROM src"
-        );
+        tEnv = StreamTableEnvironment.create(env);
+        tEnv.registerFunction("split", new Split(";"));
 
 
+        createSrc();
+        extendSrcWithPartitionColumns();
+        explodeSrcExtended();
 
-        tableEnv.executeSql(
-                "CREATE TEMPORARY VIEW src_exploded AS " +
-                        "SELECT src_extended.*, " +
-                        "TRIM(ip) AS ip " +
-                        "FROM src_extended, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(ip) " +
-                        "WHERE TRIM(ip) <> ''"
-        );
+        createImsiMsisdn();
 
-        tableEnv.executeSql("CREATE TABLE imsi_msisdn (" +
-                "imsi BIGINT," +
-                "msisdn BIGINT" +
-                ") WITH (" +
-                "'connector' = 'jdbc'," +
-                "'url' = '" + jdbc_url + "'," +
-                "'table-name' = '" + "public.imsi_msisdn" + "'," +
-                "'username' = '" + jdbc_user + "'," +
-                "'password' = '" + jdbc_password + "'" +
-                ")");
+        createMsIp();
+        explodeMsIp();
 
-        tableEnv.executeSql("CREATE TABLE ms_ip (" +
-                "start_time TIMESTAMP," +
-                "imsi BIGINT," +
-                "msisdn BIGINT," +
-                "ms_ip_address STRING " +
-//                "probe AS _probe,"
-                ") WITH (" +
-                "'connector' = 'jdbc'," +
-                "'url' = '" + jdbc_url + "'," +
-                "'table-name' = '" + "public.ms_ip" + "'," +
-                "'username' = '" + jdbc_user + "'," +
-                "'password' = '" + jdbc_password + "'" +
-                ")");
-
-        tableEnv.executeSql(
-                "CREATE TEMPORARY VIEW ms_ip_exploded AS " +
-                        "SELECT " +
-                        "ms_ip.imsi AS _imsi," +
-                        "ms_ip.msisdn AS _msisdn," +
-                        "ms_ip.start_time AS _start_time," +
-//                        "ms_ip.probe AS _probe," +
-                        "TRIM(_ip) AS _ip " +
-                        "FROM ms_ip, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(_ip) " +
-                        "WHERE TRIM(_ip) <> ''"
-        );
-
-        tableEnv.executeSql(
-                "CREATE TEMPORARY VIEW joined_imsi_msisdn AS " +
-                        "SELECT * " +
-                        "FROM src_extended " +
-                        "JOIN (" +
-                        "   SELECT " +
-                        "   imsi AS _imsi, " +
-                        "   msisdn AS _msisdn" +
-                        "   FROM imsi_msisdn" +
-                        ") AS imsi_msisdn_renamed " +
-                        "ON (" +
-                        "imsi = _imsi" +
-                        ") " +
-                        "WHERE imsi IS NOT NULL "
-//                        + "AND IMSI NOT LIKE '999%"
-
-        );
-
-        Table joinedImsiMsisdnTable = tableEnv.from("joined_imsi_msisdn")
-                .addOrReplaceColumns(coalesce($("_imsi"), $("imsi")).as("imsi"))
-                .addOrReplaceColumns(coalesce($("_msisdn"), $("msisdn")).as("msisdn"))
-                .select(
-                        $("start_time"), // херня, лучше было бы найти способ через схему. либо переделать на SQL
-                        $("measuring_probe_name"),
-                        $("imsi"),
-                        $("msisdn"),
-                        $("ms_ip_address"),
-                        $("unique_cdr_id"),
-                        $("event_date"),
-                        $("probe")
-                );
-
+        joinImsiMsisdn();
+        Table joinedImsiMsisdnTable = clearJoinedImsiMsisdn();
         System.out.println("joinedImsiMsisdnTable schema:");
         joinedImsiMsisdnTable.printSchema();
 
-        tableEnv.executeSql(
-                "CREATE TEMPORARY VIEW joined_msip AS " +
-                        "SELECT * " +
-                        "FROM src_exploded " +
-                        "JOIN ms_ip_exploded " +
-                        "ON (" +
-//                        "probe = _probe " +
-//                        "AND " +
-                        "ip = _ip " +
-                        "AND " +
-                        "start_time >= _start_time" +
-                        ") " +
-                        "WHERE imsi IS NULL "
-//                        + "OR IMSI LIKE '999%"
-
-        );
-
-
-
-        Table joinedMsipTable = tableEnv.from("joined_msip")
+        joinMsIp();
+        Table joinedMsipTable = tEnv.from("joined_msip")
                 .addOrReplaceColumns(coalesce($("_imsi"), $("imsi")).as("imsi"))
                 .addOrReplaceColumns(coalesce($("_msisdn"), $("msisdn")).as("msisdn"));
 
-        Schema joinedMsipSchema = joinedMsipTable.getSchema().toSchema();
-
+//        Schema joinedMsipSchema = joinedMsipTable.getSchema().toSchema();
 
 
         // keyed session windows
-        DataStream<Row> joined_msip_DS = tableEnv.toDataStream(joinedMsipTable);
+        DataStream<Row> joined_msip_DS = tEnv.toDataStream(joinedMsipTable);
         DataStream<Row> filtered = joined_msip_DS
                 .keyBy((KeySelector<Row, Object>) value -> value.getField("unique_cdr_id"))
                 .window(ProcessingTimeSessionWindows.withGap(Time.milliseconds(3000)))
                 .aggregate(new MaxStartTimeAggregate());
 
 
-
-//        tableEnv.registerDataStream(
-//                "filtered",
-//                filtered
-//        );
-
-        Table filteredTable = tableEnv
+        Table filteredTable = tEnv
                 .fromDataStream(filtered.map(x -> x).returns(Types.ROW(
                         Types.LOCAL_DATE_TIME,
                         Types.STRING,
@@ -233,7 +125,7 @@ public class KafkaConsoleReader {
         filteredTable.printSchema();
 
 
-        tableEnv.executeSql(
+        tEnv.executeSql(
                 "CREATE TABLE sinkTable " +
                         "(" +
                         "start_time TIMESTAMP," +
@@ -246,7 +138,7 @@ public class KafkaConsoleReader {
                         "probe STRING" +
                         ") PARTITIONED BY (event_date, probe) WITH (" +
                         "'connector' = 'filesystem'," +
-                        "'path' = './flink_parquet_results'," +
+                        "'path' = 'hdfs://namenode:8020/flink/results'," +
                         "'format' = 'parquet'," +
                         "'sink.rolling-policy.file-size' = '110MB'," +
                         "'sink.rolling-policy.check-interval' = '5 s'," +
@@ -257,22 +149,190 @@ public class KafkaConsoleReader {
 
         // sink в консоль
 
-        DataStreamSink<Row> printSink1 = tableEnv
+        DataStreamSink<Row> printSink1 = tEnv
                 .toAppendStream(filteredTable, Row.class)
                 .print("printSink1 (filteredTable)");
 
-        DataStreamSink<Row> printSink2 = tableEnv
+        DataStreamSink<Row> printSink2 = tEnv
                 .toAppendStream(joinedImsiMsisdnTable, Row.class)
                 .print("printSink2 (joinedImsiMsisdnTable)");
 
         // sink в фс
 
         filteredTable.insertInto("sinkTable").execute();
-        joinedImsiMsisdnTable.insertInto("sinkTable").execute();
+//        joinedImsiMsisdnTable.insertInto("sinkTable").execute();
 
 
         env.execute("Kafka Console Reader");
 
+    }
+
+
+
+    public static void createSrc() {
+        String src =
+                "CREATE TABLE src " +
+                        "(" +
+                        "start_time TIMESTAMP," +
+                        "measuring_probe_name STRING," +
+                        "imsi BIGINT," +
+                        "msisdn BIGINT," +
+                        "ms_ip_address STRING," +
+                        "unique_cdr_id BIGINT" +
+                        ") WITH (" +
+                        "'connector' = 'kafka'," +
+                        "'topic' = " + config.getString("kafka.topic") + "," +
+                        "'value.format' = " + config.getString("kafka.format") + "," +
+                        "'value.csv.null-literal' = ''," +
+                        "'value.csv.ignore-parse-errors' = 'true'," +
+                        "'properties.bootstrap.servers' = " + config.getString("kafka.bootstrap.servers") + "," +
+                        "'properties.group.id' = " + config.getString("kafka.group.id") + "," +
+                        "'scan.startup.mode' = 'latest-offset'" +
+                        ")";
+        tEnv.executeSql(src);
+    }
+
+    public static void createSink() {
+        String sink =
+                "CREATE TABLE sinkTable " +
+                        "(" +
+                        "start_time TIMESTAMP," +
+                        "measuring_probe_name STRING," +
+                        "imsi BIGINT," +
+                        "msisdn BIGINT," +
+                        "ms_ip_address STRING," +
+                        "unique_cdr_id BIGINT," +
+                        "event_date DATE," +
+                        "probe STRING" +
+                        ") PARTITIONED BY (event_date, probe) WITH (" +
+                        "'connector' = 'filesystem'," +
+                        "'path' = 'hdfs://namenode:8020/flink/results'," +
+                        "'format' = 'parquet'," +
+                        "'sink.rolling-policy.file-size' = '110MB'," +
+                        "'sink.rolling-policy.check-interval' = '5 s'," +
+                        "'sink.rolling-policy.rollover-interval' = '20 s'" +
+                        ")";
+        tEnv.executeSql(sink);
+    }
+
+    public static void extendSrcWithPartitionColumns() {
+        String srcExtended =
+                "CREATE TEMPORARY VIEW src_extended AS " +
+                        "SELECT *, " +
+                        "  CAST(start_time AS DATE) AS event_date, " +
+                        "  SUBSTRING(measuring_probe_name, 1, 2) AS probe " +
+                        "FROM src";
+        tEnv.executeSql(srcExtended);
+    }
+
+    public static void explodeSrcExtended() {
+        String srcExploded =
+                "CREATE TEMPORARY VIEW src_exploded AS " +
+                        "SELECT src_extended.*, " +
+                        "TRIM(ip) AS ip " +
+                        "FROM src_extended, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(ip) " +
+                        "WHERE TRIM(ip) <> ''";
+        tEnv.executeSql(srcExploded);
+    }
+
+    public static void createImsiMsisdn() {
+        String imsiMsisdn =
+                "CREATE TABLE imsi_msisdn (" +
+                        "imsi BIGINT," +
+                        "msisdn BIGINT" +
+                        ") WITH (" +
+                        "'connector' = 'jdbc'," +
+                        "'url' = '" + config.getString("imsi_msisdn.url") + "'," +
+                        "'table-name' = '" + config.getString("imsi_msisdn.dbtable") + "'," +
+                        "'username' = '" + config.getString("imsi_msisdn.user") + "'," +
+                        "'password' = '" + config.getString("imsi_msisdn.password") + "'" +
+                        ")";
+        tEnv.executeSql(imsiMsisdn);
+    }
+
+    public static void createMsIp() {
+        String msIp =
+                "CREATE TABLE ms_ip (" +
+                        "start_time TIMESTAMP," +
+                        "imsi BIGINT," +
+                        "msisdn BIGINT," +
+                        "ms_ip_address STRING," +
+                        "probe AS _probe" +
+                        ") WITH (" +
+                        "'connector' = 'jdbc'," +
+                        "'url' = '" + config.getString("ms_ip.url") + "'," +
+                        "'table-name' = '" + config.getString("ms_ip.dbtable") + "'," +
+                        "'username' = '" + config.getString("ms_ip.user") + "'," +
+                        "'password' = '" + config.getString("ms_ip.password") + "'" +
+                        ")";
+        tEnv.executeSql(msIp);
+    }
+
+    public static void explodeMsIp() {
+        String msIpExploded =
+                "CREATE TEMPORARY VIEW ms_ip_exploded AS " +
+                        "SELECT " +
+                        "ms_ip.imsi AS _imsi," +
+                        "ms_ip.msisdn AS _msisdn," +
+                        "ms_ip.start_time AS _start_time," +
+                        "ms_ip.probe AS _probe," +
+                        "TRIM(_ip) AS _ip " +
+                        "FROM ms_ip, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(_ip) " +
+                        "WHERE TRIM(_ip) <> ''";
+        tEnv.executeSql(msIpExploded);
+    }
+
+    public static void joinImsiMsisdn() {
+        String joinedImsiMsisdn =
+                "CREATE TEMPORARY VIEW joined_imsi_msisdn AS " +
+                        "SELECT * " +
+                        "FROM src_extended " +
+                        "JOIN (" +
+                        "   SELECT " +
+                        "   imsi AS _imsi, " +
+                        "   msisdn AS _msisdn" +
+                        "   FROM imsi_msisdn" +
+                        ") AS imsi_msisdn_renamed " +
+                        "ON (" +
+                        "imsi = _imsi" +
+                        ") " +
+                        "WHERE imsi IS NOT NULL ";
+//                        + "AND IMSI NOT LIKE '999%"
+        tEnv.executeSql(joinedImsiMsisdn);
+    }
+
+    public static void joinMsIp() {
+        String joinedMsIp =
+                "CREATE TEMPORARY VIEW joined_msip AS " +
+                        "SELECT * " +
+                        "FROM src_exploded " +
+                        "JOIN ms_ip_exploded " +
+                        "ON (" +
+                        "probe = _probe " +
+                        "AND " +
+                        "ip = _ip " +
+                        "AND " +
+                        "start_time >= _start_time" +
+                        ") " +
+                        "WHERE imsi IS NULL ";
+//                        + "OR IMSI LIKE '999%"
+        tEnv.executeSql(joinedMsIp);
+    }
+
+    public static Table clearJoinedImsiMsisdn() {
+        return tEnv.from("joined_imsi_msisdn")
+                .addOrReplaceColumns(coalesce($("_imsi"), $("imsi")).as("imsi"))
+                .addOrReplaceColumns(coalesce($("_msisdn"), $("msisdn")).as("msisdn"))
+                .select(
+                        $("start_time"), // херня, лучше было бы найти способ через схему. либо переделать на SQL
+                        $("measuring_probe_name"),
+                        $("imsi"),
+                        $("msisdn"),
+                        $("ms_ip_address"),
+                        $("unique_cdr_id"),
+                        $("event_date"),
+                        $("probe")
+                );
     }
 
     public static class Split extends TableFunction<String> {
