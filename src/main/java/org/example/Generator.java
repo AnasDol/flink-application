@@ -17,19 +17,22 @@ import org.apache.flink.table.functions.TableFunction;
 
 import java.io.Serializable;
 import java.sql.*;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 class CsvData implements Serializable {
 
 	private Timestamp start_time;
 	private String measuringProbeName;
-	private long imsi;
-	private long msisdn;
+	private String imsi;
+	private String msisdn;
 	private String msIpAddress;
 	private long uniqueCdrId;
 
-	private static int index = 0;
 
-	public CsvData(Timestamp start_time, String measuringProbeName, long imsi, long msisdn, String msIpAddress, long uniqueCdrId) {
+
+	public CsvData(Timestamp start_time, String measuringProbeName, String imsi, String msisdn, String msIpAddress, long uniqueCdrId) {
 		this.start_time = start_time;
 		this.measuringProbeName = measuringProbeName;
 		this.imsi = imsi;
@@ -48,11 +51,33 @@ class CsvData implements Serializable {
 		private PreparedStatement preparedStatement;
 		ResultSet resultSet;
 
+		SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+
+		static Random random = new Random();
+
+		private long index = 0;
+
+		private static final List<String> probes = Arrays.asList("DE", "cl", "ek", "ir", "kg", "kh", "mn", "nn", "ns", "rd", "sp", "sr", "st", "vr", "yd");
+
 		@Override
 		public void open(String s, FunctionInitializationContext functionInitializationContext, RuntimeContext runtimeContext) throws Exception {
 			generator = new RandomDataGenerator();
 			connection = DriverManager.getConnection(url, user, password);
-			preparedStatement = connection.prepareStatement("SELECT imsi, msisdn, ms_ip_address FROM public.ms_ip ORDER BY RANDOM()",
+//			preparedStatement = connection.prepareStatement("SELECT imsi, msisdn, ms_ip_address FROM public.ms_ip ORDER BY RANDOM()",
+//					ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+
+			preparedStatement = connection.prepareStatement(
+					"SELECT\n" +
+							"    ms_ip.imsi AS imsi,\n" +
+							"    ms_ip.msisdn AS msisdn,\n" +
+							"    TRIM(ip_table) AS ip\n" +
+							"FROM\n" +
+							"    public.ms_ip,\n" +
+							"    unnest(string_to_array(TRIM(ms_ip_address), ';')) AS ip_table\n" +
+							"WHERE\n" +
+							"    TRIM(ip_table) <> ''\n" +
+							"ORDER BY\n" +
+							"    RANDOM();",
 					ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
 
 			resultSet = preparedStatement.executeQuery();
@@ -74,18 +99,42 @@ class CsvData implements Serializable {
 				}
 
 				return new CsvData(
-						new Timestamp(2020, 5, 1, 12, 50, 30, 123),
-						"DEFAULT",
-						resultSet.getLong("imsi"),
-						resultSet.getLong("msisdn"),
-						";63.59.250.208;",
+						generateStartTime(
+								dateFormatter.parse("2020-02-05").getTime(),
+								dateFormatter.parse("2024-02-05").getTime()
+						),
+						generateMeasuringProbeName(probes),
+						getValueWithProbability(resultSet.getLong("imsi"), 0.5),
+						getValueWithProbability(resultSet.getLong("msisdn"), 0.1),
+						getMsIpAddress(resultSet), // пока только один ip
 						index++
 				);
 
-			} catch (SQLException e) {
+			} catch (SQLException | ParseException e) {
 				throw new RuntimeException(e);
 			}
 		}
+
+		public static Timestamp generateStartTime(long begin, long end) {
+			return new Timestamp(begin + Math.abs(random.nextLong()) % (end - begin));
+		}
+
+		public static String generateMeasuringProbeName(List<String> probes) {
+			return probes.get(random.nextInt(probes.size())) + "...";
+		}
+
+		public static String getValueWithProbability(long value, double p) {
+			if (Math.random() < p) {
+				return Long.toString(value);
+			} else {
+				return "";
+			}
+		}
+
+		public static String getMsIpAddress(ResultSet resultSet) throws SQLException {
+				return ";" + resultSet.getString("ip") + ";";
+		}
+
 	}
 
 	@Override
