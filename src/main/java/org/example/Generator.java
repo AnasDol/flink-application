@@ -3,10 +3,15 @@ package org.example;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.apache.commons.math3.random.RandomDataGenerator;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.RuntimeContext;
+import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
+import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.datagen.DataGenerator;
 import org.apache.flink.streaming.api.functions.source.datagen.DataGeneratorSource;
@@ -49,8 +54,6 @@ class CsvData implements Serializable {
 		RandomDataGenerator generator;
 		private PreparedStatement preparedStatement;
 		ResultSet resultSet;
-
-		SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
 		static Random random = new Random();
 
@@ -162,14 +165,31 @@ public class Generator {
 
 
 		DataGeneratorSource<CsvData> dataGeneratorSource = new DataGeneratorSource<>(
-				new CsvData.CsvDataGenerator(), 1L, null);
+				new CsvData.CsvDataGenerator(), 100, 500L);
 
-		env.addSource(dataGeneratorSource).returns(new TypeHint<CsvData>() {
-			@Override
-			public TypeInformation<CsvData> getTypeInfo() {
-				return super.getTypeInfo();
-			}
-		}).print();
+//		env.addSource(dataGeneratorSource).returns(new TypeHint<CsvData>() {
+//			@Override
+//			public TypeInformation<CsvData> getTypeInfo() {
+//				return super.getTypeInfo();
+//			}
+//		}).print();
+
+		DataStream<CsvData> dataStream = env.addSource(dataGeneratorSource)
+				.returns(new TypeHint<CsvData>() {})
+				.name("CsvData Source");
+
+		DataStream<String> stringDataStream = dataStream.map((MapFunction<CsvData, String>) CsvData::toString);
+
+		KafkaSink<String> sink = KafkaSink.<String>builder()
+				.setBootstrapServers(config.getString("kafka.bootstrap.servers"))
+				.setRecordSerializer(KafkaRecordSerializationSchema.builder()
+						.setTopic(config.getString("kafka.topic"))
+						.setValueSerializationSchema(new SimpleStringSchema())
+						.build()
+				)
+				.build();
+
+		stringDataStream.sinkTo(sink);
 
 
 		env.execute("Generator");
