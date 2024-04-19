@@ -11,16 +11,16 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.table.api.EnvironmentSettings;
-import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.functions.TableFunction;
 import org.apache.flink.types.Row;
 
+import java.io.File;
 import java.time.LocalDateTime;
 
-import static org.apache.flink.table.api.Expressions.*;
+import static org.apache.flink.table.api.Expressions.$;
+import static org.apache.flink.table.api.Expressions.coalesce;
 
 public class KafkaConsoleReader {
 
@@ -31,12 +31,12 @@ public class KafkaConsoleReader {
 
     public static void main(String[] args) throws Exception {
 
-//        if (args.length < 1) {
-//            throw new IllegalArgumentException("Path to config should be specified!");
-//        }
-//        config = ConfigFactory.parseFile(new File(args[0]));
-
-        config = ConfigFactory.load("flink.conf");
+        if (args.length > 0) {
+            String path = args[0];
+            config = ConfigFactory.parseFile(new File(path));
+        } else {
+            config = ConfigFactory.load("flink.conf");
+        }
 
         settings = EnvironmentSettings
                 .newInstance()
@@ -94,6 +94,7 @@ public class KafkaConsoleReader {
                         Types.LONG,
                         Types.LONG,
                         Types.LOCAL_DATE_TIME,
+                        Types.STRING,
                         Types.STRING)))
                 .as(
                         "start_time",
@@ -108,6 +109,7 @@ public class KafkaConsoleReader {
                         "_imsi",
                         "_msisdn",
                         "_start_time",
+                        "_probe",
                         "_ip"
                 )
                 .select(
@@ -125,25 +127,7 @@ public class KafkaConsoleReader {
         filteredTable.printSchema();
 
 
-        tEnv.executeSql(
-                "CREATE TABLE sinkTable " +
-                        "(" +
-                        "start_time TIMESTAMP," +
-                        "measuring_probe_name STRING," +
-                        "imsi BIGINT," +
-                        "msisdn BIGINT," +
-                        "ms_ip_address STRING," +
-                        "unique_cdr_id BIGINT," +
-                        "event_date DATE," +
-                        "probe STRING" +
-                        ") PARTITIONED BY (event_date, probe) WITH (" +
-                        "'connector' = 'filesystem'," +
-                        "'path' = 'hdfs://namenode:8020/flink/results'," +
-                        "'format' = 'parquet'," +
-                        "'sink.rolling-policy.file-size' = '110MB'," +
-                        "'sink.rolling-policy.check-interval' = '5 s'," +
-                        "'sink.rolling-policy.rollover-interval' = '20 s'" +
-                        ")");
+        createSink();
 
 
 
@@ -157,9 +141,9 @@ public class KafkaConsoleReader {
                 .toAppendStream(joinedImsiMsisdnTable, Row.class)
                 .print("printSink2 (joinedImsiMsisdnTable)");
 
-        // sink в фс
+        // sink в фс - вызывает UnsupportedFileSystemSchemeException: Could not find a file system implementation for scheme 'hdfs'.
 
-        filteredTable.insertInto("sinkTable").execute();
+//        filteredTable.insertInto("sinkTable").execute();
 //        joinedImsiMsisdnTable.insertInto("sinkTable").execute();
 
 
@@ -181,12 +165,12 @@ public class KafkaConsoleReader {
                         "unique_cdr_id BIGINT" +
                         ") WITH (" +
                         "'connector' = 'kafka'," +
-                        "'topic' = " + config.getString("kafka.topic") + "," +
-                        "'value.format' = " + config.getString("kafka.format") + "," +
+                        "'topic' = '" + config.getString("kafka.topic") + "'," +
+                        "'value.format' = '" + config.getString("kafka.format") + "'," +
                         "'value.csv.null-literal' = ''," +
                         "'value.csv.ignore-parse-errors' = 'true'," +
-                        "'properties.bootstrap.servers' = " + config.getString("kafka.bootstrap.servers") + "," +
-                        "'properties.group.id' = " + config.getString("kafka.group.id") + "," +
+                        "'properties.bootstrap.servers' = '" + config.getString("kafka.bootstrap.servers") + "'," +
+                        "'properties.group.id' = '" + config.getString("kafka.group_id") + "'," +
                         "'scan.startup.mode' = 'latest-offset'" +
                         ")";
         tEnv.executeSql(src);
@@ -206,9 +190,9 @@ public class KafkaConsoleReader {
                         "probe STRING" +
                         ") PARTITIONED BY (event_date, probe) WITH (" +
                         "'connector' = 'filesystem'," +
-                        "'path' = 'hdfs://namenode:8020/flink/results'," +
-                        "'format' = 'parquet'," +
-                        "'sink.rolling-policy.file-size' = '110MB'," +
+                        "'path' = '" + config.getString("hdfs.path") + "', "+
+                        "'format' = '" + config.getString("hdfs.format") + "'," +
+                        "'sink.rolling-policy.file-size' = '" + config.getString("hdfs.fileSize") + "'," +
                         "'sink.rolling-policy.check-interval' = '5 s'," +
                         "'sink.rolling-policy.rollover-interval' = '20 s'" +
                         ")";
@@ -257,7 +241,7 @@ public class KafkaConsoleReader {
                         "imsi BIGINT," +
                         "msisdn BIGINT," +
                         "ms_ip_address STRING," +
-                        "probe AS _probe" +
+                        "probe STRING" +
                         ") WITH (" +
                         "'connector' = 'jdbc'," +
                         "'url' = '" + config.getString("ms_ip.url") + "'," +

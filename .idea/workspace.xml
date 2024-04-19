@@ -4,10 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="Generator: + kafka">
-      <change afterPath="$PROJECT_DIR$/src/main/java/org/example/generator/CsvData.java" afterDir="false" />
+    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="Generator: 2 files, config">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/Generator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/generator/Generator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/flink.conf" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/flink.conf" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -46,18 +45,18 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "last_opened_file_path": "D:/Projects/IdeaProjects/Diploma/flink-quickstart/src/main/resources/META-INF/services",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Project",
-    "project.structure.proportion": "0.15",
-    "project.structure.side.proportion": "0.31034482"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Projects/IdeaProjects/Diploma/flink-quickstart/src/main/resources/META-INF/services&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.31034482&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\Projects\IdeaProjects\Diploma\flink-quickstart\src\main\resources\META-INF\services" />
@@ -91,7 +90,8 @@
       <workItem from="1712210311276" duration="9456000" />
       <workItem from="1712254426037" duration="4609000" />
       <workItem from="1712566862133" duration="2215000" />
-      <workItem from="1713105618841" duration="39102000" />
+      <workItem from="1713105618841" duration="39829000" />
+      <workItem from="1713506536130" duration="5701000" />
     </task>
     <task id="LOCAL-00001" summary="initial">
       <created>1705312528155</created>
@@ -198,7 +198,14 @@
       <option name="project" value="LOCAL" />
       <updated>1713334132993</updated>
     </task>
-    <option name="localTasksCounter" value="16" />
+    <task id="LOCAL-00016" summary="Generator: 2 files, config">
+      <created>1713343916901</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1713343916901</updated>
+    </task>
+    <option name="localTasksCounter" value="17" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -232,6 +239,7 @@
     <MESSAGE value="Generator: connect with db" />
     <MESSAGE value="Generator: wrong cursor fixed" />
     <MESSAGE value="Generator: + kafka" />
-    <option name="LAST_COMMIT_MESSAGE" value="Generator: + kafka" />
+    <MESSAGE value="Generator: 2 files, config" />
+    <option name="LAST_COMMIT_MESSAGE" value="Generator: 2 files, config" />
   </component>
 </project>
