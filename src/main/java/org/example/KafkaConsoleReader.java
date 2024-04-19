@@ -3,6 +3,7 @@ package org.example;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -10,17 +11,19 @@ import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
-import org.apache.flink.table.api.EnvironmentSettings;
-import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.*;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.table.expressions.Expression;
 import org.apache.flink.table.functions.TableFunction;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
 
 import java.io.File;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 
-import static org.apache.flink.table.api.Expressions.$;
-import static org.apache.flink.table.api.Expressions.coalesce;
+import static org.apache.flink.table.api.Expressions.*;
 
 public class KafkaConsoleReader {
 
@@ -38,10 +41,7 @@ public class KafkaConsoleReader {
             config = ConfigFactory.load("flink.conf");
         }
 
-        settings = EnvironmentSettings
-                .newInstance()
-                .inStreamingMode()
-                .build();
+        settings = EnvironmentSettings.newInstance().inStreamingMode().build();
 
         env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(config.getLong("checkpointing.interval"));
@@ -49,87 +49,43 @@ public class KafkaConsoleReader {
         tEnv = StreamTableEnvironment.create(env);
         tEnv.registerFunction("split", new Split(";"));
 
+        run();
+
+        env.execute("flink-enrichment-app");
+
+    }
+
+    public static void run() {
 
         createSrc();
-        extendSrcWithPartitionColumns();
+        Table src_extended = extendSrcWithPartitionColumns(tEnv.from("src"));
+        String[] outputFieldNames = src_extended.getSchema().getFieldNames(); // "src_extended" совпадает со схемой выходной строки
         explodeSrcExtended();
 
+
         createImsiMsisdn();
-
-        createMsIp();
-        explodeMsIp();
-
         joinImsiMsisdn();
-        Table joinedImsiMsisdnTable = clearJoinedImsiMsisdn();
+        Table joinedImsiMsisdnTable = tEnv.from("joined_imsi_msisdn");
+        joinedImsiMsisdnTable = updateImsiAndMsisdn(joinedImsiMsisdnTable);
+        joinedImsiMsisdnTable = selectColumns(joinedImsiMsisdnTable, outputFieldNames);
+
         System.out.println("joinedImsiMsisdnTable schema:");
         joinedImsiMsisdnTable.printSchema();
 
+
+        createMsIp();
+        explodeMsIp();
         joinMsIp();
-        Table joinedMsipTable = tEnv.from("joined_msip")
-                .addOrReplaceColumns(coalesce($("_imsi"), $("imsi")).as("imsi"))
-                .addOrReplaceColumns(coalesce($("_msisdn"), $("msisdn")).as("msisdn"));
-
-//        Schema joinedMsipSchema = joinedMsipTable.getSchema().toSchema();
-
-
-        // keyed session windows
-        DataStream<Row> joined_msip_DS = tEnv.toDataStream(joinedMsipTable);
-        DataStream<Row> filtered = joined_msip_DS
-                .keyBy((KeySelector<Row, Object>) value -> value.getField("unique_cdr_id"))
-                .window(ProcessingTimeSessionWindows.withGap(Time.milliseconds(3000)))
-                .aggregate(new MaxStartTimeAggregate());
-
-
-        Table filteredTable = tEnv
-                .fromDataStream(filtered.map(x -> x).returns(Types.ROW(
-                        Types.LOCAL_DATE_TIME,
-                        Types.STRING,
-                        Types.LONG,
-                        Types.LONG,
-                        Types.STRING,
-                        Types.LONG,
-                        Types.LOCAL_DATE,
-                        Types.STRING,
-                        Types.STRING,
-                        Types.LONG,
-                        Types.LONG,
-                        Types.LOCAL_DATE_TIME,
-                        Types.STRING,
-                        Types.STRING)))
-                .as(
-                        "start_time",
-                        "measuring_probe_name",
-                        "imsi",
-                        "msisdn",
-                        "ms_ip_address",
-                        "unique_cdr_id",
-                        "event_date",
-                        "probe",
-                        "ip",
-                        "_imsi",
-                        "_msisdn",
-                        "_start_time",
-                        "_probe",
-                        "_ip"
-                )
-                .select(
-                        $("start_time"), // херня, лучше было бы найти способ через схему. либо переделать на SQL
-                        $("measuring_probe_name"),
-                        $("imsi"),
-                        $("msisdn"),
-                        $("ms_ip_address"),
-                        $("unique_cdr_id"),
-                        $("event_date"),
-                        $("probe")
-                );
+        Table joinedMsipTable = tEnv.from("joined_msip");
+        joinedMsipTable = updateImsiAndMsisdn(joinedMsipTable);
+        Table filteredTable = filterByMaxStartTime(joinedMsipTable);
+        filteredTable = selectColumns(filteredTable, outputFieldNames);
 
         System.out.println("filteredTable schema:");
         filteredTable.printSchema();
 
 
         createSink();
-
-
 
         // sink в консоль
 
@@ -146,9 +102,50 @@ public class KafkaConsoleReader {
 //        filteredTable.insertInto("sinkTable").execute();
 //        joinedImsiMsisdnTable.insertInto("sinkTable").execute();
 
+    }
 
-        env.execute("Kafka Console Reader");
+    public static Table convertToTable(DataStream<Row> ds, TypeInformation<Row> typeInfo, String[] columnNames) {
+        return tEnv
+                .fromDataStream(ds.map(x -> x).returns(typeInfo))
+                .as(columnNames[0], Arrays.copyOfRange(columnNames, 1, columnNames.length));
+    }
 
+    public static Table selectColumns(Table table, String[] columnNames) {
+        Expression[] expressions = Arrays.stream(columnNames)
+                .map(Expressions::$)
+                .toArray(Expression[]::new);
+        return table.select(expressions);
+    }
+
+    /**
+     * В поля imsi и msisdn копируются соответствующие значения из полей _imsi и _msisdn
+     */
+    public static Table updateImsiAndMsisdn(Table table) {
+        return table
+                .addOrReplaceColumns(coalesce($("_imsi"), $("imsi")).as("imsi"))
+                .addOrReplaceColumns(coalesce($("_msisdn"), $("msisdn")).as("msisdn"));
+    }
+
+
+    /**
+     * Метод оставляет в таблице только строки с максимальным значением поля _start_time для каждого уникального unique_cdr_id.
+     * Таблица преобразуется в датастрим, фильтруется с помощью сессионных окон и агрегатирующей функции MaxStartTimeAggregate
+     * и снова преобразуется к таблице.
+     */
+    public static Table filterByMaxStartTime(Table table) {
+
+        // keyed session windows
+        DataStream<Row> filtered = tEnv.toDataStream(table)
+                .keyBy((KeySelector<Row, Object>) value -> value.getField("unique_cdr_id"))
+                .window(ProcessingTimeSessionWindows.withGap(Time.milliseconds(3000)))
+                .aggregate(new MaxStartTimeAggregate());
+
+        // получаем типы данных и имена колонок, чтобы восстановить таблицу из датастрима
+        TypeInformation<?>[] columnTypes = table.getSchema().getFieldTypes();
+        TypeInformation<Row> filteredTypeInfo = Types.ROW(columnTypes);
+        String[] fieldNames = table.getSchema().getFieldNames();
+
+        return convertToTable(filtered, filteredTypeInfo, fieldNames);
     }
 
 
@@ -199,15 +196,29 @@ public class KafkaConsoleReader {
         tEnv.executeSql(sink);
     }
 
-    public static void extendSrcWithPartitionColumns() {
-        String srcExtended =
-                "CREATE TEMPORARY VIEW src_extended AS " +
-                        "SELECT *, " +
-                        "  CAST(start_time AS DATE) AS event_date, " +
-                        "  SUBSTRING(measuring_probe_name, 1, 2) AS probe " +
-                        "FROM src";
-        tEnv.executeSql(srcExtended);
+
+
+    public static Table extendSrcWithPartitionColumns(Table src) {
+        Table src_extended = src
+                .select(
+                        $("*"),
+                        $("start_time").cast(DataTypes.DATE()).as("event_date"),
+                        $("measuring_probe_name").substring(1,2).as("probe")
+                );
+        // Регистрируем расширенную таблицу во временном представлении
+        tEnv.createTemporaryView("src_extended", src_extended);
+        return src_extended;
     }
+
+//    public static void extendSrcWithPartitionColumns() {
+//        String srcExtended =
+//                "CREATE TEMPORARY VIEW src_extended AS " +
+//                        "SELECT *, " +
+//                        "  CAST(start_time AS DATE) AS event_date, " +
+//                        "  SUBSTRING(measuring_probe_name, 1, 2) AS probe " +
+//                        "FROM src";
+//        tEnv.executeSql(srcExtended);
+//    }
 
     public static void explodeSrcExtended() {
         String srcExploded =
@@ -303,29 +314,12 @@ public class KafkaConsoleReader {
         tEnv.executeSql(joinedMsIp);
     }
 
-    public static Table clearJoinedImsiMsisdn() {
-        return tEnv.from("joined_imsi_msisdn")
-                .addOrReplaceColumns(coalesce($("_imsi"), $("imsi")).as("imsi"))
-                .addOrReplaceColumns(coalesce($("_msisdn"), $("msisdn")).as("msisdn"))
-                .select(
-                        $("start_time"), // херня, лучше было бы найти способ через схему. либо переделать на SQL
-                        $("measuring_probe_name"),
-                        $("imsi"),
-                        $("msisdn"),
-                        $("ms_ip_address"),
-                        $("unique_cdr_id"),
-                        $("event_date"),
-                        $("probe")
-                );
-    }
 
     public static class Split extends TableFunction<String> {
         private String separator = ",";
-
         public Split(String separator){
             this.separator = separator;
         }
-
         public void eval(String str){
             for (String s: str.split(separator)){
                     collect(s);

@@ -51,7 +51,7 @@ public class Generator {
 		stringDataStream.sinkTo(sink);
 
 
-		env.execute("Generator");
+		env.execute("flink-kafka-generator");
 
 	}
 
