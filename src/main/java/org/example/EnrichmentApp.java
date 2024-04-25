@@ -15,17 +15,16 @@ import org.apache.flink.table.api.*;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.expressions.Expression;
 import org.apache.flink.table.functions.TableFunction;
-import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
 
 import java.io.File;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.List;
 
 import static org.apache.flink.table.api.Expressions.*;
 
-public class KafkaConsoleReader {
+public class EnrichmentApp {
 
     private static Config config;
     private static EnvironmentSettings settings;
@@ -58,13 +57,17 @@ public class KafkaConsoleReader {
     public static void run() {
 
         createSrc();
-        Table src_extended = extendSrcWithPartitionColumns(tEnv.from("src"));
-        String[] outputFieldNames = src_extended.getSchema().getFieldNames(); // "src_extended" совпадает со схемой выходной строки
+        extendSrcWithPartitionColumns();
+        extendSrcWithProctime();
         explodeSrcExtended();
+
+        // "src_extended" совпадает со схемой выходной строки
+        String[] outputFieldNames = tEnv.from("src_extended").getSchema().getFieldNames();
 
 
         createImsiMsisdn();
-        joinImsiMsisdn();
+        lookupJoinImsiMsisdn();
+//        joinImsiMsisdn();
         Table joinedImsiMsisdnTable = tEnv.from("joined_imsi_msisdn");
         joinedImsiMsisdnTable = updateImsiAndMsisdn(joinedImsiMsisdnTable);
         joinedImsiMsisdnTable = selectColumns(joinedImsiMsisdnTable, outputFieldNames);
@@ -75,15 +78,15 @@ public class KafkaConsoleReader {
 
         createMsIp();
         explodeMsIp();
+//        lookupJoinMsIp();
         joinMsIp();
         Table joinedMsipTable = tEnv.from("joined_msip");
-        joinedMsipTable = updateImsiAndMsisdn(joinedMsipTable);
-        Table filteredTable = filterByMaxStartTime(joinedMsipTable);
+        joinedMsipTable = updateImsiAndMsisdn(joinedMsipTable.dropColumns($("proc_time")));
+        Table filteredTable = filterByMaxStartTime(joinedMsipTable); // ! - падает если не убрать поле proc_time
         filteredTable = selectColumns(filteredTable, outputFieldNames);
 
         System.out.println("filteredTable schema:");
         filteredTable.printSchema();
-
 
         createSink();
 
@@ -131,13 +134,15 @@ public class KafkaConsoleReader {
      * Метод оставляет в таблице только строки с максимальным значением поля _start_time для каждого уникального unique_cdr_id.
      * Таблица преобразуется в датастрим, фильтруется с помощью сессионных окон и агрегатирующей функции MaxStartTimeAggregate
      * и снова преобразуется к таблице.
+     * WARNING! Падает с ошибкой "caught exception while processing timer. could not forward element to next operator"
+     * если перед вызовом не удалить из таблицы поле proc_time.
      */
     public static Table filterByMaxStartTime(Table table) {
 
         // keyed session windows
         DataStream<Row> filtered = tEnv.toDataStream(table)
                 .keyBy((KeySelector<Row, Object>) value -> value.getField("unique_cdr_id"))
-                .window(ProcessingTimeSessionWindows.withGap(Time.milliseconds(3000)))
+                .window(ProcessingTimeSessionWindows.withGap(Time.milliseconds(1000)))
                 .aggregate(new MaxStartTimeAggregate());
 
         // получаем типы данных и имена колонок, чтобы восстановить таблицу из датастрима
@@ -196,36 +201,31 @@ public class KafkaConsoleReader {
         tEnv.executeSql(sink);
     }
 
-
-
-    public static Table extendSrcWithPartitionColumns(Table src) {
-        Table src_extended = src
-                .select(
-                        $("*"),
-                        $("start_time").cast(DataTypes.DATE()).as("event_date"),
-                        $("measuring_probe_name").substring(1,2).as("probe")
-                );
-        // Регистрируем расширенную таблицу во временном представлении
-        tEnv.createTemporaryView("src_extended", src_extended);
-        return src_extended;
+    public static void extendSrcWithPartitionColumns() {
+        String srcExtended =
+                "CREATE TEMPORARY VIEW src_extended AS " +
+                        "SELECT *, " +
+                        "  CAST(start_time AS DATE) AS event_date, " +
+                        "  SUBSTRING(measuring_probe_name, 1, 2) AS probe " +
+                        "FROM src";
+        tEnv.executeSql(srcExtended);
     }
 
-//    public static void extendSrcWithPartitionColumns() {
-//        String srcExtended =
-//                "CREATE TEMPORARY VIEW src_extended AS " +
-//                        "SELECT *, " +
-//                        "  CAST(start_time AS DATE) AS event_date, " +
-//                        "  SUBSTRING(measuring_probe_name, 1, 2) AS probe " +
-//                        "FROM src";
-//        tEnv.executeSql(srcExtended);
-//    }
+    public static void extendSrcWithProctime() {
+        String srcExtended =
+                "CREATE TEMPORARY VIEW src_extended_proc AS " +
+                        "SELECT *, " +
+                        "  PROCTIME() AS proc_time " +
+                        "FROM src_extended";
+        tEnv.executeSql(srcExtended);
+    }
 
     public static void explodeSrcExtended() {
         String srcExploded =
                 "CREATE TEMPORARY VIEW src_exploded AS " +
-                        "SELECT src_extended.*, " +
+                        "SELECT src_extended_proc.*, " +
                         "TRIM(ip) AS ip " +
-                        "FROM src_extended, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(ip) " +
+                        "FROM src_extended_proc, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(ip) " +
                         "WHERE TRIM(ip) <> ''";
         tEnv.executeSql(srcExploded);
     }
@@ -266,14 +266,10 @@ public class KafkaConsoleReader {
     public static void explodeMsIp() {
         String msIpExploded =
                 "CREATE TEMPORARY VIEW ms_ip_exploded AS " +
-                        "SELECT " +
-                        "ms_ip.imsi AS _imsi," +
-                        "ms_ip.msisdn AS _msisdn," +
-                        "ms_ip.start_time AS _start_time," +
-                        "ms_ip.probe AS _probe," +
-                        "TRIM(_ip) AS _ip " +
-                        "FROM ms_ip, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(_ip) " +
-                        "WHERE TRIM(_ip) <> ''";
+                        "SELECT *, " +
+                        "TRIM(ip) AS ip " +
+                        "FROM ms_ip, LATERAL TABLE(split(TRIM(ms_ip_address))) AS T(ip) " +
+                        "WHERE TRIM(ip) <> ''";
         tEnv.executeSql(msIpExploded);
     }
 
@@ -296,23 +292,68 @@ public class KafkaConsoleReader {
         tEnv.executeSql(joinedImsiMsisdn);
     }
 
+    public static void lookupJoinImsiMsisdn() {
+        String lookupJoinQuery =
+                "CREATE TEMPORARY VIEW joined_imsi_msisdn AS " +
+                        "SELECT " +
+                        "  src_extended_proc.*, " +
+                        "  imsi_msisdn.imsi AS _imsi, " +
+                        "  imsi_msisdn.msisdn AS _msisdn " +
+                        "FROM " +
+                        "  src_extended_proc " +
+                        "JOIN " +
+                        "  imsi_msisdn " +
+                        "FOR SYSTEM_TIME AS OF src_extended_proc.proc_time AS imsi_msisdn " +
+                        "ON " +
+                        "  src_extended_proc.imsi = imsi_msisdn.imsi " +
+                        "WHERE " +
+                        "  src_extended_proc.imsi IS NOT NULL";
+
+        tEnv.executeSql(lookupJoinQuery);
+    }
+
     public static void joinMsIp() {
         String joinedMsIp =
                 "CREATE TEMPORARY VIEW joined_msip AS " +
-                        "SELECT * " +
+                        "SELECT " +
+                        "  src_exploded.*, " +
+                        "  ms_ip_exploded.imsi AS _imsi, " +
+                        "  ms_ip_exploded.msisdn AS _msisdn, " +
+                        "  ms_ip_exploded.start_time AS _start_time " +
                         "FROM src_exploded " +
                         "JOIN ms_ip_exploded " +
                         "ON (" +
-                        "probe = _probe " +
+                        "src_exploded.probe = ms_ip_exploded.probe " +
                         "AND " +
-                        "ip = _ip " +
+                        "src_exploded.ip = ms_ip_exploded.ip " +
                         "AND " +
-                        "start_time >= _start_time" +
+                        "src_exploded.start_time >= ms_ip_exploded.start_time" +
                         ") " +
-                        "WHERE imsi IS NULL ";
+                        "WHERE src_exploded.imsi IS NULL ";
 //                        + "OR IMSI LIKE '999%"
         tEnv.executeSql(joinedMsIp);
     }
+//    проблема - temporary view src_exploded уже не является lookup source.
+//    н/б простое решение - принять что в ms_ip уже есть поле ip (explode выполнять при записи из GTPC)
+//    public static void lookupJoinMsIp() {
+//        String joinedMsIp =
+//                "CREATE TEMPORARY VIEW joined_msip AS " +
+//                        "SELECT " +
+//                        "  src_exploded.*, " +
+//                        "  ms_ip_exploded.imsi AS _imsi, " +
+//                        "  ms_ip_exploded.msisdn AS _msisdn " +
+//                        "FROM src_exploded " +
+//                        " JOIN ms_ip_exploded " +
+//                        "FOR SYSTEM_TIME AS OF src_exploded.proc_time AS ms_ip_exploded " +
+//                        "ON (" +
+//                        "  src_exploded.ip = ms_ip_exploded.ip " +
+//                        "  AND src_exploded.probe = ms_ip_exploded.probe " +
+//                        "  AND src_exploded.start_time >= ms_ip_exploded.start_time" +
+//                        ") " +
+//                        "WHERE src_exploded.imsi IS NULL";
+//        // + "OR IMSI LIKE '999%'";
+//        tEnv.executeSql(joinedMsIp);
+//    }
 
 
     public static class Split extends TableFunction<String> {
@@ -336,7 +377,7 @@ public class KafkaConsoleReader {
 
         @Override
         public Row add(Row value, Row accumulator) {
-            if (accumulator == null || ((LocalDateTime) value.getField("_start_time")).isAfter((LocalDateTime) accumulator.getField("_start_time"))) {
+            if (accumulator == null || ((Timestamp) value.getField("_start_time")).after((Timestamp) accumulator.getField("_start_time"))) {
                 return value;
             }
             return accumulator;
@@ -349,7 +390,7 @@ public class KafkaConsoleReader {
 
         @Override
         public Row merge(Row a, Row b) {
-            if (a == null || ((LocalDateTime) b.getField("_start_time")).isAfter((LocalDateTime) a.getField("_start_time"))) {
+            if (a == null || ((Timestamp) b.getField("_start_time")).after((Timestamp) a.getField("_start_time"))) {
                 return b; // Merge two accumulators by keeping the one with larger _start_time
             }
             return a;

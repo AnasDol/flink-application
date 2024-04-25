@@ -4,10 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="KafkaConsoleReader is compatible with Generator">
+    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="KafkaConsoleReader renamed to EnrichmentApp; proctime() added; a lookup join implemented (only for imsi_msisdn root)">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/generator/Generator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/generator/Generator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/EnrichmentApp.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/flink.conf" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/flink.conf" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,7 +31,7 @@
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/pom.xml" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/src/main/java/org/example/KafkaConsoleReader.java" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/src/main/java/org/example/EnrichmentApp.java" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../Users/anast/Универ/7 семестр/ВКР/CompactionApp.scala" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="MarkdownSettingsMigration">
@@ -91,7 +92,8 @@
       <workItem from="1712254426037" duration="4609000" />
       <workItem from="1712566862133" duration="2215000" />
       <workItem from="1713105618841" duration="39829000" />
-      <workItem from="1713506536130" duration="13836000" />
+      <workItem from="1713506536130" duration="14831000" />
+      <workItem from="1713777622646" duration="30120000" />
     </task>
     <task id="LOCAL-00001" summary="initial">
       <created>1705312528155</created>
@@ -212,7 +214,14 @@
       <option name="project" value="LOCAL" />
       <updated>1713518058112</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="total refactoring">
+      <created>1713526405550</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1713526405550</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -248,6 +257,8 @@
     <MESSAGE value="Generator: + kafka" />
     <MESSAGE value="Generator: 2 files, config" />
     <MESSAGE value="KafkaConsoleReader is compatible with Generator" />
-    <option name="LAST_COMMIT_MESSAGE" value="KafkaConsoleReader is compatible with Generator" />
+    <MESSAGE value="total refactoring" />
+    <MESSAGE value="KafkaConsoleReader renamed to EnrichmentApp; proctime() added; a lookup join implemented (only for imsi_msisdn root)" />
+    <option name="LAST_COMMIT_MESSAGE" value="KafkaConsoleReader renamed to EnrichmentApp; proctime() added; a lookup join implemented (only for imsi_msisdn root)" />
   </component>
 </project>
