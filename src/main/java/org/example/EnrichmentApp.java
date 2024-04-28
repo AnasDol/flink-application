@@ -6,6 +6,8 @@ import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.configuration.CheckpointingOptions;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -43,7 +45,7 @@ public class EnrichmentApp {
         settings = EnvironmentSettings.newInstance().inStreamingMode().build();
 
         env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(config.getLong("checkpointing.interval"));
+        env.enableCheckpointing(config.getLong("checkpoint.interval"));
 
         tEnv = StreamTableEnvironment.create(env);
         tEnv.registerFunction("split", new Split(";"));
@@ -240,7 +242,10 @@ public class EnrichmentApp {
                         "'url' = '" + config.getString("imsi_msisdn.url") + "'," +
                         "'table-name' = '" + config.getString("imsi_msisdn.dbtable") + "'," +
                         "'username' = '" + config.getString("imsi_msisdn.user") + "'," +
-                        "'password' = '" + config.getString("imsi_msisdn.password") + "'" +
+                        "'password' = '" + config.getString("imsi_msisdn.password") + "'," +
+                        "'lookup.cache' = 'PARTIAL'," +
+                        "'lookup.partial-cache.max-rows' = '100'," +
+                        "'lookup.partial-cache.expire-after-write' = '60s'" +
                         ")";
         tEnv.executeSql(imsiMsisdn);
     }
@@ -377,7 +382,7 @@ public class EnrichmentApp {
 
         @Override
         public Row add(Row value, Row accumulator) {
-            if (accumulator == null || ((Timestamp) value.getField("_start_time")).after((Timestamp) accumulator.getField("_start_time"))) {
+            if (accumulator == null || ((LocalDateTime) value.getField("_start_time")).isAfter((LocalDateTime) accumulator.getField("_start_time"))) {
                 return value;
             }
             return accumulator;
@@ -390,7 +395,7 @@ public class EnrichmentApp {
 
         @Override
         public Row merge(Row a, Row b) {
-            if (a == null || ((Timestamp) b.getField("_start_time")).after((Timestamp) a.getField("_start_time"))) {
+            if (a == null || ((LocalDateTime) b.getField("_start_time")).isAfter((LocalDateTime) a.getField("_start_time"))) {
                 return b; // Merge two accumulators by keeping the one with larger _start_time
             }
             return a;

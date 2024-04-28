@@ -13,6 +13,8 @@ import org.apache.flink.streaming.api.functions.source.datagen.DataGeneratorSour
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
+import java.io.File;
+
 public class Generator {
 
 	private static Config config;
@@ -22,7 +24,13 @@ public class Generator {
 
 	public static void main(String[] args) throws Exception {
 
-		config = ConfigFactory.load("flink.conf");
+		if (args.length > 0) {
+			String path = args[0];
+			config = ConfigFactory.parseFile(new File(path));
+		} else {
+			config = ConfigFactory.load("flink.conf");
+		}
+
 		settings = EnvironmentSettings.newInstance().inStreamingMode().build();
 		env = StreamExecutionEnvironment.getExecutionEnvironment();
 
@@ -30,7 +38,7 @@ public class Generator {
 				new DataGeneratorSource<>(
 						new CsvData.CsvDataGenerator(config),
 						config.getInt("generator.rowsPerSecond"),
-						config.getLong("generator.numberOfRows")
+						config.getLong("generator.numberOfRows") > 0L ? config.getLong("generator.numberOfRows") : null
 				);
 
 		DataStream<CsvData> dataStream = env.addSource(dataGeneratorSource)
