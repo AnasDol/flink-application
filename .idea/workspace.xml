@@ -4,10 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="KafkaConsoleReader renamed to EnrichmentApp; proctime() added; a lookup join implemented (only for imsi_msisdn root)">
+    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="lookup cache">
+      <change afterPath="$PROJECT_DIR$/src/main/java/org/example/EnrichmentAppWithoutExplode.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/EnrichmentApp.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/EnrichmentApp.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/generator/Generator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/generator/Generator.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/flink.conf" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/flink.conf" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -94,7 +93,7 @@
       <workItem from="1713105618841" duration="39829000" />
       <workItem from="1713506536130" duration="14831000" />
       <workItem from="1713777622646" duration="33405000" />
-      <workItem from="1714118043934" duration="9910000" />
+      <workItem from="1714118043934" duration="18372000" />
     </task>
     <task id="LOCAL-00001" summary="initial">
       <created>1705312528155</created>
@@ -229,7 +228,14 @@
       <option name="project" value="LOCAL" />
       <updated>1714033840178</updated>
     </task>
-    <option name="localTasksCounter" value="20" />
+    <task id="LOCAL-00020" summary="lookup cache">
+      <created>1714300684550</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1714300684667</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -267,6 +273,7 @@
     <MESSAGE value="KafkaConsoleReader is compatible with Generator" />
     <MESSAGE value="total refactoring" />
     <MESSAGE value="KafkaConsoleReader renamed to EnrichmentApp; proctime() added; a lookup join implemented (only for imsi_msisdn root)" />
-    <option name="LAST_COMMIT_MESSAGE" value="KafkaConsoleReader renamed to EnrichmentApp; proctime() added; a lookup join implemented (only for imsi_msisdn root)" />
+    <MESSAGE value="lookup cache" />
+    <option name="LAST_COMMIT_MESSAGE" value="lookup cache" />
   </component>
 </project>
