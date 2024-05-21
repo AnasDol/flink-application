@@ -171,7 +171,9 @@ public class EnrichmentAppWithoutExplode {
                         "'value.csv.null-literal' = ''," +
                         "'value.csv.ignore-parse-errors' = 'true'," +
                         "'properties.bootstrap.servers' = '" + config.getString("kafka.bootstrap.servers") + "'," +
-                        "'properties.group.id' = '" + config.getString("kafka.group_id") + "'," +
+//                        "'properties.group.id' = '" + config.getString("kafka.group_id") + "'," +
+                        "'properties.security.protocol' = 'SASL_PLAINTEXT'," +
+                        "'properties.sasl.kerberos.service.name' = 'kafka'," +
                         "'scan.startup.mode' = 'latest-offset'" +
                         ")";
         tEnv.executeSql(src);

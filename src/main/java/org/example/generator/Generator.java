@@ -33,6 +33,7 @@ public class Generator {
 
 		settings = EnvironmentSettings.newInstance().inStreamingMode().build();
 		env = StreamExecutionEnvironment.getExecutionEnvironment();
+		env.enableCheckpointing(config.getLong("checkpoint.interval"));
 
 		DataGeneratorSource<CsvData> dataGeneratorSource =
 				new DataGeneratorSource<>(
@@ -54,6 +55,10 @@ public class Generator {
 						.setValueSerializationSchema(new SimpleStringSchema())
 						.build()
 				)
+				.setProperty("security.protocol", "SASL_PLAINTEXT")
+				.setProperty("sasl.kerberos.service.name", "kafka")
+				.setProperty("enable.idempotence", "false")
+				.setTransactionalIdPrefix("test")
 				.build();
 
 		stringDataStream.sinkTo(sink);

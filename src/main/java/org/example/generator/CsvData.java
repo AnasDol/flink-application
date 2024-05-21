@@ -66,7 +66,7 @@ class CsvData implements Serializable {
                     "    ms_ip.msisdn AS msisdn,\n" +
                     "    TRIM(ip_table) AS ip\n" +
                     "FROM\n" +
-                    "    public.ms_ip,\n" +
+                    "    " + config.getString("ms_ip.dbtable") + ",\n" +
                     "    unnest(string_to_array(TRIM(ms_ip_address), ';')) AS ip_table\n" +
                     "WHERE\n" +
                     "    TRIM(ip_table) <> ''\n" +

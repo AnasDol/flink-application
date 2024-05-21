@@ -4,9 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="lookup cache">
-      <change afterPath="$PROJECT_DIR$/src/main/java/org/example/EnrichmentAppWithoutExplode.java" afterDir="false" />
+    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="lookup cache for ms_ip (without explode)">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/EnrichmentAppWithoutExplode.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/EnrichmentAppWithoutExplode.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/generator/CsvData.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/generator/CsvData.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/generator/Generator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/generator/Generator.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/flink.conf" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/flink.conf" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -93,7 +95,11 @@
       <workItem from="1713105618841" duration="39829000" />
       <workItem from="1713506536130" duration="14831000" />
       <workItem from="1713777622646" duration="33405000" />
-      <workItem from="1714118043934" duration="18372000" />
+      <workItem from="1714118043934" duration="19012000" />
+      <workItem from="1715092560980" duration="987000" />
+      <workItem from="1715842199492" duration="643000" />
+      <workItem from="1716013882333" duration="5290000" />
+      <workItem from="1716181459065" duration="9701000" />
     </task>
     <task id="LOCAL-00001" summary="initial">
       <created>1705312528155</created>
@@ -235,7 +241,14 @@
       <option name="project" value="LOCAL" />
       <updated>1714300684667</updated>
     </task>
-    <option name="localTasksCounter" value="21" />
+    <task id="LOCAL-00021" summary="lookup cache for ms_ip (without explode)">
+      <created>1714464902084</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1714464902085</updated>
+    </task>
+    <option name="localTasksCounter" value="22" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -274,6 +287,7 @@
     <MESSAGE value="total refactoring" />
     <MESSAGE value="KafkaConsoleReader renamed to EnrichmentApp; proctime() added; a lookup join implemented (only for imsi_msisdn root)" />
     <MESSAGE value="lookup cache" />
-    <option name="LAST_COMMIT_MESSAGE" value="lookup cache" />
+    <MESSAGE value="lookup cache for ms_ip (without explode)" />
+    <option name="LAST_COMMIT_MESSAGE" value="lookup cache for ms_ip (without explode)" />
   </component>
 </project>
