@@ -174,7 +174,7 @@ public class EnrichmentAppWithoutExplode {
 //                        "'properties.group.id' = '" + config.getString("kafka.group_id") + "'," +
                         "'properties.security.protocol' = 'SASL_PLAINTEXT'," +
                         "'properties.sasl.kerberos.service.name' = 'kafka'," +
-                        "'scan.startup.mode' = 'latest-offset'" +
+                        "'scan.startup.mode' = '" + config.getString("kafka.scan.startup.mode") + "'" +
                         ")";
         tEnv.executeSql(src);
     }
@@ -297,7 +297,8 @@ public class EnrichmentAppWithoutExplode {
                         "SELECT " +
                         "  src_exploded.*, " +
                         "  ms_ip_exploded.imsi AS _imsi, " +
-                        "  ms_ip_exploded.msisdn AS _msisdn " +
+                        "  ms_ip_exploded.msisdn AS _msisdn, " +
+                        "  ms_ip_exploded.start_time AS _start_time " +
                         "FROM src_exploded " +
                         " JOIN ms_ip_exploded " +
                         "FOR SYSTEM_TIME AS OF src_exploded.proc_time AS ms_ip_exploded " +
