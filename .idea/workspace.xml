@@ -4,10 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="kerberos authentication">
+    <list default="true" id="9648f02e-b895-4951-96fb-0caaaa06ec57" name="Changes" comment="&quot;unknown field name '_start_time'&quot; fixed">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/org/example/EnrichmentAppWithoutExplode.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/EnrichmentAppWithoutExplode.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/flink.conf" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/flink.conf" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/generator/Generator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/generator/Generator.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -97,7 +97,9 @@
       <workItem from="1715092560980" duration="987000" />
       <workItem from="1715842199492" duration="643000" />
       <workItem from="1716013882333" duration="5290000" />
-      <workItem from="1716181459065" duration="13601000" />
+      <workItem from="1716181459065" duration="20574000" />
+      <workItem from="1716797211702" duration="808000" />
+      <workItem from="1716898395124" duration="14513000" />
     </task>
     <task id="LOCAL-00001" summary="initial">
       <created>1705312528155</created>
@@ -253,7 +255,14 @@
       <option name="project" value="LOCAL" />
       <updated>1716277780783</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="&quot;unknown field name '_start_time'&quot; fixed">
+      <created>1716287178131</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1716287178131</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -294,6 +303,7 @@
     <MESSAGE value="lookup cache" />
     <MESSAGE value="lookup cache for ms_ip (without explode)" />
     <MESSAGE value="kerberos authentication" />
-    <option name="LAST_COMMIT_MESSAGE" value="kerberos authentication" />
+    <MESSAGE value="&quot;unknown field name '_start_time'&quot; fixed" />
+    <option name="LAST_COMMIT_MESSAGE" value="&quot;unknown field name '_start_time'&quot; fixed" />
   </component>
 </project>

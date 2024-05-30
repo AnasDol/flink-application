@@ -43,11 +43,10 @@ public class EnrichmentAppWithoutExplode {
         }
 
         settings = EnvironmentSettings.newInstance().inStreamingMode().build();
-
         env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(config.getLong("checkpoint.interval"));
-
         tEnv = StreamTableEnvironment.create(env);
+
         tEnv.registerFunction("split", new Split(";"));
 
         run();
@@ -91,18 +90,18 @@ public class EnrichmentAppWithoutExplode {
 
         // sink в консоль
 
-        DataStreamSink<Row> printSink1 = tEnv
-                .toAppendStream(filteredTable, Row.class)
-                .print("printSink1 (filteredTable)");
-
-        DataStreamSink<Row> printSink2 = tEnv
-                .toAppendStream(joinedImsiMsisdnTable, Row.class)
-                .print("printSink2 (joinedImsiMsisdnTable)");
+//        DataStreamSink<Row> printSink1 = tEnv
+//                .toAppendStream(filteredTable, Row.class)
+//                .print("printSink1 (filteredTable)");
+//
+//        DataStreamSink<Row> printSink2 = tEnv
+//                .toAppendStream(joinedImsiMsisdnTable, Row.class)
+//                .print("printSink2 (joinedImsiMsisdnTable)");
 
         // sink в фс - вызывает UnsupportedFileSystemSchemeException: Could not find a file system implementation for scheme 'hdfs'.
 
-//        filteredTable.insertInto("sinkTable").execute();
-//        joinedImsiMsisdnTable.insertInto("sinkTable").execute();
+        filteredTable.insertInto("sinkTable").execute();
+        joinedImsiMsisdnTable.insertInto("sinkTable").execute();
 
     }
 
@@ -234,18 +233,20 @@ public class EnrichmentAppWithoutExplode {
     public static void createImsiMsisdn() {
         String imsiMsisdn =
                 "CREATE TABLE imsi_msisdn (" +
-                        "imsi BIGINT," +
-                        "msisdn BIGINT" +
-                        ") WITH (" +
-                        "'connector' = 'jdbc'," +
-                        "'url' = '" + config.getString("imsi_msisdn.url") + "'," +
-                        "'table-name' = '" + config.getString("imsi_msisdn.dbtable") + "'," +
-                        "'username' = '" + config.getString("imsi_msisdn.user") + "'," +
-                        "'password' = '" + config.getString("imsi_msisdn.password") + "'," +
-                        "'lookup.cache' = 'PARTIAL'," +
-                        "'lookup.partial-cache.max-rows' = '" + config.getString("imsi_msisdn.lookup.partial-cache.max-rows") + "'," +
-                        "'lookup.partial-cache.expire-after-write' = '" + config.getString("imsi_msisdn.lookup.partial-cache.expire-after-write") + "'" +
-                        ")";
+                "imsi BIGINT," +
+                "msisdn BIGINT" +
+                ") WITH (" +
+                "'connector' = 'jdbc'," +
+                "'url' = '" + config.getString("imsi_msisdn.url") + "'," +
+                "'table-name' = '" + config.getString("imsi_msisdn.dbtable") + "'," +
+                "'username' = '" + config.getString("imsi_msisdn.user") + "'," +
+                "'password' = '" + config.getString("imsi_msisdn.password") + "'," +
+                "'lookup.cache' = 'PARTIAL'," +
+                "'lookup.partial-cache.max-rows' = '"
+                        + config.getString("imsi_msisdn.lookup.partial-cache.max-rows") + "'," +
+                "'lookup.partial-cache.expire-after-write' = '"
+                        + config.getString("imsi_msisdn.lookup.partial-cache.expire-after-write") + "'" +
+                ")";
         tEnv.executeSql(imsiMsisdn);
     }
 
@@ -280,7 +281,7 @@ public class EnrichmentAppWithoutExplode {
                         "  imsi_msisdn.msisdn AS _msisdn " +
                         "FROM " +
                         "  src_extended_proc " +
-                        "JOIN " +
+                        "LEFT JOIN " +
                         "  imsi_msisdn " +
                         "FOR SYSTEM_TIME AS OF src_extended_proc.proc_time AS imsi_msisdn " +
                         "ON " +
@@ -300,7 +301,7 @@ public class EnrichmentAppWithoutExplode {
                         "  ms_ip_exploded.msisdn AS _msisdn, " +
                         "  ms_ip_exploded.start_time AS _start_time " +
                         "FROM src_exploded " +
-                        " JOIN ms_ip_exploded " +
+                        "LEFT JOIN ms_ip_exploded " +
                         "FOR SYSTEM_TIME AS OF src_exploded.proc_time AS ms_ip_exploded " +
                         "ON (" +
                         "  src_exploded.ip = ms_ip_exploded.ip " +
@@ -326,29 +327,29 @@ public class EnrichmentAppWithoutExplode {
     }
 
     public static class MaxStartTimeAggregate implements AggregateFunction<Row, Row, Row> {
-
         @Override
         public Row createAccumulator() {
             return null;
         }
-
         @Override
         public Row add(Row value, Row accumulator) {
-            if (accumulator == null || ((LocalDateTime) value.getField("_start_time")).isAfter((LocalDateTime) accumulator.getField("_start_time"))) {
+            if (accumulator == null ||
+                    ((LocalDateTime) value.getField("_start_time"))
+                            .isAfter((LocalDateTime) accumulator.getField("_start_time"))) {
                 return value;
             }
             return accumulator;
         }
-
         @Override
         public Row getResult(Row accumulator) {
             return accumulator;
         }
-
         @Override
         public Row merge(Row a, Row b) {
-            if (a == null || ((LocalDateTime) b.getField("_start_time")).isAfter((LocalDateTime) a.getField("_start_time"))) {
-                return b; // Merge two accumulators by keeping the one with larger _start_time
+            if (a == null ||
+                    ((LocalDateTime) b.getField("_start_time"))
+                            .isAfter((LocalDateTime) a.getField("_start_time"))) {
+                return b;
             }
             return a;
         }

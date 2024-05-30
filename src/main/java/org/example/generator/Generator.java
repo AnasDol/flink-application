@@ -55,8 +55,8 @@ public class Generator {
 						.setValueSerializationSchema(new SimpleStringSchema())
 						.build()
 				)
-				.setProperty("security.protocol", "SASL_PLAINTEXT")
-				.setProperty("sasl.kerberos.service.name", "kafka")
+				.setProperty("security.protocol", "SASL_PLAINTEXT") // для кластера
+				.setProperty("sasl.kerberos.service.name", "kafka") // для кластера
 				.setProperty("enable.idempotence", "false")
 				.setTransactionalIdPrefix("test")
 				.build();
