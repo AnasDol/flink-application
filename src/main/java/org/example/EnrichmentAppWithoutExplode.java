@@ -180,24 +180,24 @@ public class EnrichmentAppWithoutExplode {
 
     public static void createSink() {
         String sink =
-                "CREATE TABLE sinkTable " +
-                        "(" +
-                        "start_time TIMESTAMP," +
-                        "measuring_probe_name STRING," +
-                        "imsi BIGINT," +
-                        "msisdn BIGINT," +
-                        "ms_ip_address STRING," +
-                        "unique_cdr_id BIGINT," +
-                        "event_date DATE," +
-                        "probe STRING" +
-                        ") PARTITIONED BY (event_date, probe) WITH (" +
-                        "'connector' = 'filesystem'," +
-                        "'path' = '" + config.getString("hdfs.path") + "', "+
-                        "'format' = '" + config.getString("hdfs.format") + "'," +
-                        "'sink.rolling-policy.file-size' = '" + config.getString("hdfs.fileSize") + "'," +
-                        "'sink.rolling-policy.check-interval' = '5 s'," +
-                        "'sink.rolling-policy.rollover-interval' = '20 s'" +
-                        ")";
+            "CREATE TABLE sinkTable " +
+                "(" +
+                "start_time TIMESTAMP," +
+                "measuring_probe_name STRING," +
+                "imsi BIGINT," +
+                "msisdn BIGINT," +
+                "ms_ip_address STRING," +
+                "unique_cdr_id BIGINT," +
+                "event_date STRING," +
+                "probe STRING" +
+                ") PARTITIONED BY (event_date, probe) WITH (" +
+                "'connector' = 'filesystem'," +
+                "'path' = '" + config.getString("hdfs.path") + "', "+
+                "'format' = '" + config.getString("hdfs.format") + "'," +
+                "'sink.rolling-policy.file-size' = '" + config.getString("hdfs.fileSize") + "'," +
+                "'sink.rolling-policy.check-interval' = '5 s'," +
+                "'sink.rolling-policy.rollover-interval' = '20 s'" +
+                ")";
         tEnv.executeSql(sink);
     }
 
@@ -205,8 +205,8 @@ public class EnrichmentAppWithoutExplode {
         String srcExtended =
                 "CREATE TEMPORARY VIEW src_extended AS " +
                         "SELECT *, " +
-                        "  CAST(start_time AS DATE) AS event_date, " +
-                        "  SUBSTRING(measuring_probe_name, 1, 2) AS probe " +
+                        "DATE_FORMAT(start_time, 'yyyy-MM-dd') AS event_date, " +
+                        "SUBSTRING(measuring_probe_name, 1, 2) AS probe " +
                         "FROM src";
         tEnv.executeSql(srcExtended);
     }

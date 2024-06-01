@@ -57,7 +57,7 @@ public class Generator {
 				)
 				.setProperty("security.protocol", "SASL_PLAINTEXT") // для кластера
 				.setProperty("sasl.kerberos.service.name", "kafka") // для кластера
-				.setProperty("enable.idempotence", "false")
+				.setProperty("enable.idempotence", "false") // для кластера
 				.setTransactionalIdPrefix("test")
 				.build();
 
